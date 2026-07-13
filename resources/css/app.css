@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+html, body {
+    font-family: 'Inter', sans-serif;
+}
+
+.font-display {
+    font-family: 'Fraunces', serif;
+}
+
+@layer components {
+    .btn {
+        @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 disabled:pointer-events-none;
+    }
+    .btn-primary {
+        @apply btn bg-primary text-primary-foreground hover:bg-primary/90;
+    }
+    .btn-outline {
+        @apply btn border border-border bg-card text-foreground hover:bg-muted;
+    }
+    .btn-ghost {
+        @apply btn hover:bg-muted;
+    }
+    .field-label {
+        @apply block text-sm font-medium text-foreground mb-1.5;
+    }
+    .field-input {
+        @apply block w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent;
+    }
+    .card {
+        @apply rounded-xl border border-border bg-card text-card-foreground shadow-sm;
+    }
+    .badge {
+        @apply inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground;
+    }
+    .table-shell table {
+        @apply w-full text-sm;
+    }
+    .table-shell thead {
+        @apply bg-muted/60 text-left text-muted-foreground;
+    }
+    .table-shell th, .table-shell td {
+        @apply px-3 py-3;
+    }
+    .table-shell tbody tr {
+        @apply border-t border-border;
+    }
+}
