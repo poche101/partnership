@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\PartnersExport;
 use App\Models\Church;
 use App\Models\Partner;
 use App\Services\SemanticPartnerSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PartnerController extends Controller
 {
@@ -36,7 +38,12 @@ class PartnerController extends Controller
                     $w->where('first_name', 'like', "%{$q}%")
                         ->orWhere('last_name', 'like', "%{$q}%")
                         ->orWhere('email', 'like', "%{$q}%")
-                        ->orWhere('kingschat_username', 'like', "%{$q}%");
+                        ->orWhere('kingschat_username', 'like', "%{$q}%")
+                        ->orWhere('spouse_first_name', 'like', "%{$q}%")
+                        ->orWhere('spouse_last_name', 'like', "%{$q}%")
+                        ->orWhere('spouse_name', 'like', "%{$q}%")
+                        ->orWhere('spouse_email', 'like', "%{$q}%")
+                        ->orWhere('spouse_kingschat', 'like', "%{$q}%");
                 });
             }
             $partners = $query->get();
@@ -68,6 +75,7 @@ class PartnerController extends Controller
             'church_id' => ['nullable', 'exists:churches,id'],
             'spouse_title' => ['nullable', 'string', 'max:100'],
             'spouse_first_name' => ['nullable', 'string', 'max:255'],
+            'spouse_last_name' => ['nullable', 'string', 'max:255'],
             'spouse_delegate_category' => ['nullable', 'string'],
             'spouse_kingschat' => ['nullable', 'string', 'max:255'],
             'spouse_phone' => ['nullable', 'string', 'max:50'],
@@ -85,8 +93,22 @@ class PartnerController extends Controller
         unset($data['church_id']);
         $data['church_id'] = $churchId;
 
+        // Keep spouse_name (used by the Givings statement/table) in sync with
+        // the detailed spouse fields collected here, so a partner created via
+        // this form shows their spouse consistently everywhere.
+        $spouseName = trim(($data['spouse_title'] ?? '').' '.($data['spouse_first_name'] ?? '').' '.($data['spouse_last_name'] ?? ''));
+        $spouseName = preg_replace('/\s+/', ' ', $spouseName);
+        if ($spouseName !== '') {
+            $data['spouse_name'] = $spouseName;
+        }
+
         Partner::create($data);
 
         return back()->with('success', 'Partner added.');
+    }
+
+    public function export()
+    {
+        return Excel::download(new PartnersExport, 'partners-'.now()->format('Y-m-d').'.xlsx');
     }
 }

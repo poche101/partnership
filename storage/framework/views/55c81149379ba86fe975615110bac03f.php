@@ -1,6 +1,6 @@
-@extends('layouts.app')
-@section('title', 'Bulk Upload')
-@section('content')
+
+<?php $__env->startSection('title', 'Bulk Upload'); ?>
+<?php $__env->startSection('content'); ?>
 <div class="mx-auto max-w-6xl px-6 py-8">
     <h1 class="font-display text-2xl text-primary">Bulk Upload</h1>
     <p class="mt-1 text-sm text-muted-foreground">
@@ -9,17 +9,17 @@
     </p>
 
     <div class="card mt-6 p-6">
-        @if ($churches->count())
+        <?php if($churches->count()): ?>
             <div class="mb-4">
                 <label class="field-label">Church</label>
                 <select id="church-select" class="field-input max-w-sm">
-                    @foreach ($churches as $c)
-                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                    @endforeach
+                    <?php $__currentLoopData = $churches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $c): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <option value="<?php echo e($c->id); ?>"><?php echo e($c->name); ?></option>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 </select>
                 <p class="mt-1 text-xs text-muted-foreground">Used for rows that don't specify their own Church Name column.</p>
             </div>
-        @endif
+        <?php endif; ?>
 
         <input type="file" id="file-input" accept=".xlsx,.xls,.csv" class="block w-full text-sm">
         <p class="mt-2 text-xs text-muted-foreground">
@@ -56,7 +56,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-const ARM_KEYS = @json(\App\Models\PartnershipEntry::ARM_KEYS);
+const ARM_KEYS = <?php echo json_encode(\App\Models\PartnershipEntry::ARM_KEYS, 15, 512) ?>;
 const PARTNER_FIELDS = [
     'title','first_name','last_name','delegate_category','kingschat_username','phone','email',
     'church_name','church_category','group_name',
@@ -142,7 +142,7 @@ document.getElementById('confirm-import').addEventListener('click', async () => 
     btn.textContent = 'Importing…';
 
     try {
-        const res = await fetch(@json(route('upload.import')), {
+        const res = await fetch(<?php echo json_encode(route('upload.import'), 15, 512) ?>, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -170,4 +170,5 @@ document.getElementById('confirm-import').addEventListener('click', async () => 
     }
 });
 </script>
-@endsection
+<?php $__env->stopSection(); ?>
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\kings\partnership\partnership\resources\views/upload/index.blade.php ENDPATH**/ ?>

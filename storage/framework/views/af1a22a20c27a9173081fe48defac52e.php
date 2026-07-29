@@ -1,20 +1,20 @@
-@extends('layouts.app')
-@section('title', 'Giving Statements')
-@section('content')
+
+<?php $__env->startSection('title', 'Giving Statements'); ?>
+<?php $__env->startSection('content'); ?>
 <div class="mx-auto max-w-5xl px-6 py-8">
     <h1 class="font-display text-2xl text-primary">Giving Statements</h1>
     <p class="mt-1 text-sm text-muted-foreground">Generate a partnership giving statement for a partner over an optional date range.</p>
 
     <div class="card mt-6 p-6">
-        <form method="POST" action="{{ route('statements.store') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-4">
-            @csrf
+        <form method="POST" action="<?php echo e(route('statements.store')); ?>" class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+            <?php echo csrf_field(); ?>
             <div class="sm:col-span-2">
                 <label class="field-label">Partner</label>
                 <select name="partner_id" required class="field-input">
                     <option value="">Select partner…</option>
-                    @foreach ($partners as $p)
-                        <option value="{{ $p->id }}">{{ trim($p->title.' '.$p->first_name.' '.$p->last_name) }}</option>
-                    @endforeach
+                    <?php $__currentLoopData = $partners; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <option value="<?php echo e($p->id); ?>"><?php echo e(trim($p->title.' '.$p->first_name.' '.$p->last_name)); ?></option>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 </select>
             </div>
             <div>
@@ -34,7 +34,7 @@
         </form>
     </div>
 
-    @if (session('statement_preview'))
+    <?php if(session('statement_preview')): ?>
         <div class="mt-8">
             <div id="statement-doc" class="statement-doc">
                 <div class="statement-frame">
@@ -46,7 +46,7 @@
                         </div>
                         <div class="statement-doc-id">
                             <p class="statement-eyebrow">Statement</p>
-                            <p class="statement-date">{{ now()->format('M j, Y') }}</p>
+                            <p class="statement-date"><?php echo e(now()->format('M j, Y')); ?></p>
                         </div>
                     </div>
 
@@ -55,7 +55,7 @@
                     <h2 class="statement-title">Partnership Giving Statement</h2>
 
                     <div class="statement-body">
-                        <pre class="statement-content">{{ session('statement_preview') }}</pre>
+                        <pre class="statement-content"><?php echo e(session('statement_preview')); ?></pre>
                     </div>
 
                     <div class="statement-footer">
@@ -85,32 +85,32 @@
                     Download as PDF
                 </button>
 
-                @if (session('statement_id'))
-                    <form method="POST" action="{{ route('statements.send', session('statement_id')) }}">
-                        @csrf
+                <?php if(session('statement_id')): ?>
+                    <form method="POST" action="<?php echo e(route('statements.send', session('statement_id'))); ?>">
+                        <?php echo csrf_field(); ?>
                         <button type="submit" class="btn-primary btn-icon" onclick="this.disabled=true; this.querySelector('.btn-label').textContent='Sending…'; this.closest('form').submit();">
                             <svg viewBox="0 0 20 20" fill="none" class="btn-svg"><path d="M3 5l7 5 7-5M3 5h14v10H3V5z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>
                             <span class="btn-label">Email to Partner</span>
                         </button>
                     </form>
-                @endif
+                <?php endif; ?>
             </div>
         </div>
-    @endif
+    <?php endif; ?>
 
     <div class="table-shell card mt-8 overflow-x-auto">
         <table>
             <thead><tr><th>Partner</th><th>Period</th><th>Total</th><th>Generated</th><th></th></tr></thead>
             <tbody>
-                @forelse ($statements as $s)
+                <?php $__empty_1 = true; $__currentLoopData = $statements; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $s): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                     <tr>
-                        <td class="font-medium">{{ $s->partner?->fullName() }}</td>
-                        <td>{{ $s->period_start?->format('M j, Y') ?? '—' }} – {{ $s->period_end?->format('M j, Y') ?? '—' }}</td>
-                        <td class="font-mono">{{ number_format($s->total_espees, 2) }}</td>
-                        <td>{{ $s->created_at->format('M j, Y g:ia') }}</td>
+                        <td class="font-medium"><?php echo e($s->partner?->fullName()); ?></td>
+                        <td><?php echo e($s->period_start?->format('M j, Y') ?? '—'); ?> – <?php echo e($s->period_end?->format('M j, Y') ?? '—'); ?></td>
+                        <td class="font-mono"><?php echo e(number_format($s->total_espees, 2)); ?></td>
+                        <td><?php echo e($s->created_at->format('M j, Y g:ia')); ?></td>
                         <td>
-                            <form method="POST" action="{{ route('statements.send', $s->id) }}">
-                                @csrf
+                            <form method="POST" action="<?php echo e(route('statements.send', $s->id)); ?>">
+                                <?php echo csrf_field(); ?>
                                 <button type="submit" class="btn-link-icon" title="Resend by email">
                                     <svg viewBox="0 0 20 20" fill="none" class="btn-svg-sm"><path d="M3 5l7 5 7-5M3 5h14v10H3V5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
                                     Resend
@@ -118,9 +118,9 @@
                             </form>
                         </td>
                     </tr>
-                @empty
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <tr><td colspan="5" class="py-6 text-center text-muted-foreground">No statements generated yet.</td></tr>
-                @endforelse
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -332,4 +332,5 @@ document.getElementById('download-pdf')?.addEventListener('click', async () => {
     }
 });
 </script>
-@endsection
+<?php $__env->stopSection(); ?>
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\kings\partnership\partnership\resources\views/statements/index.blade.php ENDPATH**/ ?>

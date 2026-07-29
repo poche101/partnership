@@ -2,8 +2,16 @@
 @section('title', 'Giving Alerts')
 @section('content')
 <div class="mx-auto max-w-5xl px-6 py-8">
-    <h1 class="font-display text-2xl text-primary">Giving Alerts</h1>
-    <p class="mt-1 text-sm text-muted-foreground">Alerts fire automatically when a giving entry meets a configured threshold for an arm.</p>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="font-display text-2xl text-primary">Giving Alerts</h1>
+            <p class="mt-1 text-sm text-muted-foreground">Alerts fire automatically when a giving entry meets a configured threshold for an arm.</p>
+        </div>
+        <a href="{{ route('alerts.export') }}" class="btn-outline btn-icon">
+            <svg viewBox="0 0 20 20" fill="none" class="btn-svg"><path d="M10 3v10m0 0l-4-4m4 4l4-4M4 16h12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Download Excel
+        </a>
+    </div>
 
     @if (auth()->user()->isZoneAdmin())
         <div class="card mt-6 p-6">

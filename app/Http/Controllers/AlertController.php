@@ -7,9 +7,16 @@ use App\Models\GivingAlertThreshold;
 use App\Support\Arms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Exports\AlertsExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AlertController extends Controller
 {
+
+public function export()
+{
+    return Excel::download(new AlertsExport, 'giving-alerts-'.now()->format('Y-m-d').'.xlsx');
+}
     public function index()
     {
         $user = Auth::user();

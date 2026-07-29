@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\GivingStatementMail;
 use App\Models\GivingStatement;
 use App\Models\Partner;
 use App\Services\AuditLogger;
 use App\Services\GivingStatementWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 
 class StatementController extends Controller
 {
@@ -46,4 +48,22 @@ class StatementController extends Controller
 
         return back()->with('statement_preview', $statement->content)->with('success', 'Statement generated.');
     }
+
+    public function send(GivingStatement $statement)
+{
+    $partner = $statement->partner;
+
+    if (empty($partner->email)) {
+        return back()->with('error', 'This partner has no email address on file.');
+    }
+
+    Mail::to($partner->email)->send(new GivingStatementMail($statement));
+
+    AuditLogger::log(Auth::user(), 'statement.emailed', 'giving_statement', $statement->id, [
+        'partner_id' => $partner->id,
+        'email' => $partner->email,
+    ]);
+
+    return back()->with('success', 'Statement sent to '.$partner->email.'.');
+}
 }

@@ -1,27 +1,100 @@
 @extends('layouts.app')
 @section('title', 'Audit Logs')
 @section('content')
-<div class="mx-auto max-w-6xl px-6 py-8">
+<div class="mx-auto max-w-4xl px-6 py-8">
     <h1 class="font-display text-2xl text-primary">Audit Logs</h1>
-    <p class="mt-1 text-sm text-muted-foreground">System-wide activity trail (latest 500 events).</p>
+    <p class="mt-1 text-sm text-muted-foreground">
+        @if(request()->filled('entity_type') || request()->filled('entity_id'))
+            Filtered activity trail.
+            <a href="{{ route('audit.index') }}" class="underline">Clear filter</a>
+        @else
+            System-wide activity trail.
+        @endif
+    </p>
 
-    <div class="table-shell card mt-6 overflow-x-auto">
-        <table>
-            <thead><tr><th>Date</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
-            <tbody>
-                @forelse ($logs as $log)
-                    <tr>
-                        <td class="whitespace-nowrap">{{ $log->created_at->format('M j, Y g:ia') }}</td>
-                        <td>{{ $log->actor_email ?? '—' }}</td>
-                        <td><span class="badge">{{ $log->action }}</span></td>
-                        <td>{{ $log->entity_type }}@if($log->entity_id) #{{ $log->entity_id }}@endif</td>
-                        <td class="max-w-xs truncate font-mono text-xs" title="{{ json_encode($log->details) }}">{{ json_encode($log->details) }}</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="5" class="py-6 text-center text-muted-foreground">No activity recorded yet.</td></tr>
-                @endforelse
-            </tbody>
-        </table>
+    <form method="GET" action="{{ route('audit.index') }}" class="mt-4 flex gap-2">
+        @if(request()->filled('entity_type'))
+            <input type="hidden" name="entity_type" value="{{ request('entity_type') }}">
+        @endif
+        @if(request()->filled('entity_id'))
+            <input type="hidden" name="entity_id" value="{{ request('entity_id') }}">
+        @endif
+        <input
+            type="text"
+            name="q"
+            value="{{ request('q') }}"
+            placeholder="Search by actor, action, or partner…"
+            class="field-input flex-1"
+        >
+        <button type="submit" class="btn-primary">Search</button>
+        @if(request()->filled('q'))
+            <a href="{{ route('audit.index', request()->except('q')) }}" class="btn-outline">Clear</a>
+        @endif
+    </form>
+
+    <div class="mt-6 space-y-3">
+        @forelse ($logs as $log)
+            <div class="card p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="badge">{{ str(str_replace('.', ' ', $log->action))->headline() }}</span>
+                        <span class="text-sm text-muted-foreground">{{ $log->actor_email ?? 'System' }}</span>
+                    </div>
+                    <span class="text-xs text-muted-foreground whitespace-nowrap">
+                        {{ $log->created_at->format('M j, Y g:ia') }}
+                    </span>
+                </div>
+
+                <div class="mt-2 text-sm">
+                    @if($log->action === 'giving.recorded')
+                        <p>
+                            Recorded a gift from <strong>{{ $log->details['partner'] ?? 'Unknown partner' }}</strong>.
+                        </p>
+                        @if(!empty($log->details['changes']))
+                            <ul class="mt-2 space-y-1 text-muted-foreground">
+                                @foreach ($log->details['changes'] as $arm => $change)
+                                    <li>
+                                        <span class="font-medium text-foreground">{{ \App\Support\Arms::label($arm) }}:</span>
+                                        {{ number_format($change['before'], 2) }}
+                                        <span class="text-primary">+{{ number_format($change['added'], 2) }}</span>
+                                        &rarr; {{ number_format($change['after'], 2) }} ESPEES
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    @else
+                        <p class="text-muted-foreground">
+                            {{ $log->entity_type ? class_basename($log->entity_type) : 'Entity' }}
+                            @if($log->entity_id) #{{ $log->entity_id }} @endif
+                        </p>
+                        @if(!empty($log->details))
+                            <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-3">
+                                @foreach ($log->details as $key => $value)
+                                    @if(!is_array($value))
+                                        <div>
+                                            <dt class="font-medium text-foreground">{{ str($key)->headline() }}</dt>
+                                            <dd>{{ $value }}</dd>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </dl>
+                        @endif
+                    @endif
+                </div>
+            </div>
+        @empty
+            <div class="card p-6 text-center text-muted-foreground">
+                @if(request()->filled('q'))
+                    No activity matches "{{ request('q') }}".
+                @else
+                    No activity recorded yet.
+                @endif
+            </div>
+        @endforelse
+    </div>
+
+    <div class="mt-6">
+        {{ $logs->links() }}
     </div>
 </div>
 @endsection

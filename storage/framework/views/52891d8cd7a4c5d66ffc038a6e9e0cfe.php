@@ -1,30 +1,24 @@
-@extends('layouts.app')
-@section('title', 'Partners')
-@section('content')
+
+<?php $__env->startSection('title', 'Partners'); ?>
+<?php $__env->startSection('content'); ?>
 <div class="mx-auto max-w-6xl px-6 py-8">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="font-display text-2xl text-primary">Partners</h1>
             <p class="mt-1 text-sm text-muted-foreground">All partners visible within your scope.</p>
         </div>
-        <div class="flex gap-2">
-            <a href="{{ route('partners.export') }}" class="btn-outline btn-icon">
-                <svg viewBox="0 0 20 20" fill="none" class="btn-svg"><path d="M10 3v10m0 0l-4-4m4 4l4-4M4 16h12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Download Excel
-            </a>
-            <button data-open-modal="new-partner" class="btn-primary">+ New Partner</button>
-        </div>
+        <button data-open-modal="new-partner" class="btn-primary">+ New Partner</button>
     </div>
 
     <form method="GET" class="mt-6 flex flex-wrap items-center gap-2">
-        <input type="text" name="q" value="{{ $q }}" placeholder="Search name, email, KingsChat..." class="field-input max-w-sm">
-        @auth
-            @if (auth()->user()->isZoneAdmin())
+        <input type="text" name="q" value="<?php echo e($q); ?>" placeholder="Search name, email, KingsChat..." class="field-input max-w-sm">
+        <?php if(auth()->guard()->check()): ?>
+            <?php if(auth()->user()->isZoneAdmin()): ?>
                 <label class="flex items-center gap-2 text-sm text-muted-foreground">
-                    <input type="checkbox" name="ai" value="1" {{ $aiMode ? 'checked' : '' }}> AI semantic search
+                    <input type="checkbox" name="ai" value="1" <?php echo e($aiMode ? 'checked' : ''); ?>> AI semantic search
                 </label>
-            @endif
-        @endauth
+            <?php endif; ?>
+        <?php endif; ?>
         <button type="submit" class="btn-outline">Search</button>
     </form>
 
@@ -32,28 +26,28 @@
         <table>
             <thead><tr><th>Name</th><th>Church</th><th>Category</th><th>KingsChat</th><th>Phone</th><th>Email</th></tr></thead>
             <tbody>
-                @forelse ($partners as $p)
-                    @php
-                        $spouseCompact = trim(($p->spouse_first_name ?? '').' '.($p->spouse_last_name ?? ''));
-                        $spouseTooltip = collect([$p->spouse_delegate_category, $p->spouse_kingschat, $p->spouse_phone, $p->spouse_email])
-                            ->filter()->implode(' · ');
-                    @endphp
+                <?php $__empty_1 = true; $__currentLoopData = $partners; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php
+                        $spouseDisplay = trim(($p->spouse_title ?? '').' '.($p->spouse_first_name ?? ''));
+                        $spouseDisplay = $spouseDisplay !== '' ? $spouseDisplay : ($p->spouse_name ?? null);
+                    ?>
                     <tr>
                         <td class="font-medium">
-                            {{ $p->fullName() }}
-                            @if($spouseCompact)
-                                <span class="text-muted-foreground font-normal" title="{{ $spouseTooltip }}">&amp; {{ $spouseCompact }}</span>
-                            @endif
+                            <?php echo e($p->fullName()); ?>
+
+                            <?php if($spouseDisplay): ?>
+                                <span class="text-muted-foreground font-normal">&amp; <?php echo e($spouseDisplay); ?></span>
+                            <?php endif; ?>
                         </td>
-                        <td>{{ $p->church?->name }}</td>
-                        <td>{{ $p->delegate_category ?: '—' }}</td>
-                        <td>{{ $p->kingschat_username ?: '—' }}</td>
-                        <td>{{ $p->phone ?: '—' }}</td>
-                        <td>{{ $p->email ?: '—' }}</td>
+                        <td><?php echo e($p->church?->name); ?></td>
+                        <td><?php echo e($p->delegate_category ?: '—'); ?></td>
+                        <td><?php echo e($p->kingschat_username ?: '—'); ?></td>
+                        <td><?php echo e($p->phone ?: '—'); ?></td>
+                        <td><?php echo e($p->email ?: '—'); ?></td>
                     </tr>
-                @empty
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <tr><td colspan="6" class="py-6 text-center text-muted-foreground">No partners found.</td></tr>
-                @endforelse
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -62,18 +56,18 @@
 <div id="new-partner" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4 overflow-y-auto">
     <div class="card my-8 w-full max-w-2xl p-6">
         <h2 class="font-display text-lg text-primary">New Partner</h2>
-        <form method="POST" action="{{ route('partners.store') }}" class="mt-4 space-y-4">
-            @csrf
-            @if ($churches->count() > 1 || !auth()->user()->isChurchAdmin())
+        <form method="POST" action="<?php echo e(route('partners.store')); ?>" class="mt-4 space-y-4">
+            <?php echo csrf_field(); ?>
+            <?php if($churches->count() > 1 || !auth()->user()->isChurchAdmin()): ?>
                 <div>
                     <label class="field-label">Church</label>
                     <select name="church_id" required class="field-input">
-                        @foreach ($churches as $c)
-                            <option value="{{ $c->id }}">{{ $c->name }}</option>
-                        @endforeach
+                        <?php $__currentLoopData = $churches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $c): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($c->id); ?>"><?php echo e($c->name); ?></option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </select>
                 </div>
-            @endif
+            <?php endif; ?>
             <div class="grid grid-cols-3 gap-3">
                 <div><label class="field-label">Title</label><input name="title" class="field-input"></div>
                 <div class="col-span-1"><label class="field-label">First name</label><input name="first_name" required class="field-input"></div>
@@ -84,9 +78,9 @@
                     <label class="field-label">Delegate category</label>
                     <select name="delegate_category" class="field-input">
                         <option value="">—</option>
-                        @foreach ($delegateCategories as $dc)
-                            <option value="{{ $dc }}">{{ $dc }}</option>
-                        @endforeach
+                        <?php $__currentLoopData = $delegateCategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $dc): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($dc); ?>"><?php echo e($dc); ?></option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </select>
                 </div>
                 <div><label class="field-label">KingsChat username</label><input name="kingschat_username" class="field-input"></div>
@@ -99,8 +93,7 @@
                 <summary class="cursor-pointer text-sm font-medium text-foreground">Spouse details (optional)</summary>
                 <div class="mt-3 grid grid-cols-3 gap-3">
                     <div><label class="field-label">Title</label><input name="spouse_title" class="field-input"></div>
-                    <div><label class="field-label">First name</label><input name="spouse_first_name" class="field-input"></div>
-                    <div><label class="field-label">Surname</label><input name="spouse_last_name" class="field-input"></div>
+                    <div class="col-span-2"><label class="field-label">First name</label><input name="spouse_first_name" class="field-input"></div>
                 </div>
                 <div class="mt-3 grid grid-cols-2 gap-3">
                     <div><label class="field-label">KingsChat</label><input name="spouse_kingschat" class="field-input"></div>
@@ -115,4 +108,5 @@
         </form>
     </div>
 </div>
-@endsection
+<?php $__env->stopSection(); ?>
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\kings\partnership\partnership\resources\views/partners/index.blade.php ENDPATH**/ ?>
