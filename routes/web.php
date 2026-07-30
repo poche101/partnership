@@ -15,17 +15,20 @@ use App\Http\Controllers\StatementController;
 use App\Http\Controllers\UploadController;
 use Illuminate\Support\Facades\Route;
 
+
 Route::get('/', LandingController::class)->name('home');
 
 Route::middleware('guest')->group(function () {
     Route::get('/auth', [AuthController::class, 'show'])->name('login');
     Route::post('/auth', [AuthController::class, 'login'])->name('login.attempt');
 });
+
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
+    // ZONE ADMIN ONLY ROUTES
     Route::middleware('role:zone_admin')->group(function () {
         Route::get('/search', [SearchController::class, 'index'])->name('search');
         Route::post('/search', [SearchController::class, 'search'])->name('search.run');
@@ -40,13 +43,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/arms', [ArmController::class, 'index'])->name('arms.index');
         Route::post('/arms', [ArmController::class, 'store'])->name('arms.store');
         Route::patch('/arms/{arm}', [ArmController::class, 'update'])->name('arms.update');
+        
+        Route::post('/alerts/thresholds', [AlertController::class, 'saveThreshold'])->name('alerts.thresholds.save');
     });
 
+    // ZONE & GROUP ADMIN ROUTES
     Route::middleware('role:zone_admin,group_admin')->group(function () {
         Route::get('/churches', [ChurchController::class, 'index'])->name('churches.index');
         Route::post('/churches', [ChurchController::class, 'store'])->name('churches.store');
     });
 
+    // ALL ADMINS (ZONE, GROUP, CHURCH) ROUTES
     Route::middleware('role:zone_admin,group_admin,church_admin')->group(function () {
         Route::get('/partners/export', [PartnerController::class, 'export'])->name('partners.export');
         Route::get('/partners', [PartnerController::class, 'index'])->name('partners.index');
@@ -64,6 +71,4 @@ Route::middleware('auth')->group(function () {
         Route::get('/alerts', [AlertController::class, 'index'])->name('alerts.index');
         Route::patch('/alerts/{alert}/acknowledge', [AlertController::class, 'acknowledge'])->name('alerts.acknowledge');
     });
-
-    Route::middleware('role:zone_admin')->post('/alerts/thresholds', [AlertController::class, 'saveThreshold'])->name('alerts.thresholds.save');
 });
