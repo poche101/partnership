@@ -47,12 +47,32 @@
 
                 <div class="mt-2 text-sm">
                     @if($log->action === 'giving.recorded')
+                        @php
+                            $d = $log->details ?? [];
+                            $hasGranularSpouse = !empty($d['spouse_first_name']);
+
+                            if ($hasGranularSpouse) {
+                                $surname = $d['spouse_last_name'] ?? $d['partner_last_name'] ?? '';
+                                $displayName = collect([
+                                    $d['partner_title'] ?? null,
+                                    $d['partner_first_name'] ?? null,
+                                    $d['spouse_title'] ?? null,
+                                    $d['spouse_first_name'] ?? null,
+                                    $surname ?: null,
+                                ])->filter()->implode(', ');
+                            } elseif (!empty($d['spouse_name'])) {
+                                // Legacy entries: only flat name strings available
+                                $displayName = ($d['partner'] ?? 'Unknown partner').' & '.$d['spouse_name'];
+                            } else {
+                                $displayName = $d['partner'] ?? 'Unknown partner';
+                            }
+                        @endphp
                         <p>
-                            Recorded a gift from <strong>{{ $log->details['partner'] ?? 'Unknown partner' }}</strong>.
+                            Recorded a gift from <strong>{{ $displayName }}</strong>.
                         </p>
-                        @if(!empty($log->details['changes']))
+                        @if(!empty($d['changes']))
                             <ul class="mt-2 space-y-1 text-muted-foreground">
-                                @foreach ($log->details['changes'] as $arm => $change)
+                                @foreach ($d['changes'] as $arm => $change)
                                     <li>
                                         <span class="font-medium text-foreground">{{ \App\Support\Arms::label($arm) }}:</span>
                                         {{ number_format($change['before'], 2) }}

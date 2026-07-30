@@ -48,12 +48,32 @@
 
                 <div class="mt-2 text-sm">
                     <?php if($log->action === 'giving.recorded'): ?>
+                        <?php
+                            $d = $log->details ?? [];
+                            $hasGranularSpouse = !empty($d['spouse_first_name']);
+
+                            if ($hasGranularSpouse) {
+                                $surname = $d['spouse_last_name'] ?? $d['partner_last_name'] ?? '';
+                                $displayName = collect([
+                                    $d['partner_title'] ?? null,
+                                    $d['partner_first_name'] ?? null,
+                                    $d['spouse_title'] ?? null,
+                                    $d['spouse_first_name'] ?? null,
+                                    $surname ?: null,
+                                ])->filter()->implode(', ');
+                            } elseif (!empty($d['spouse_name'])) {
+                                // Legacy entries: only flat name strings available
+                                $displayName = ($d['partner'] ?? 'Unknown partner').' & '.$d['spouse_name'];
+                            } else {
+                                $displayName = $d['partner'] ?? 'Unknown partner';
+                            }
+                        ?>
                         <p>
-                            Recorded a gift from <strong><?php echo e($log->details['partner'] ?? 'Unknown partner'); ?></strong>.
+                            Recorded a gift from <strong><?php echo e($displayName); ?></strong>.
                         </p>
-                        <?php if(!empty($log->details['changes'])): ?>
+                        <?php if(!empty($d['changes'])): ?>
                             <ul class="mt-2 space-y-1 text-muted-foreground">
-                                <?php $__currentLoopData = $log->details['changes']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $arm => $change): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <?php $__currentLoopData = $d['changes']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $arm => $change): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                     <li>
                                         <span class="font-medium text-foreground"><?php echo e(\App\Support\Arms::label($arm)); ?>:</span>
                                         <?php echo e(number_format($change['before'], 2)); ?>

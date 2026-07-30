@@ -13,7 +13,16 @@
                 <select name="partner_id" required class="field-input">
                     <option value="">Select partner…</option>
                     <?php $__currentLoopData = $partners; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($p->id); ?>"><?php echo e(trim($p->title.' '.$p->first_name.' '.$p->last_name)); ?></option>
+                        <?php
+                            $optionName = collect([
+                                $p->title ?? null,
+                                $p->first_name ?? null,
+                                $p->spouse_title ?? null,
+                                $p->spouse_first_name ?? null,
+                                ($p->spouse_last_name ?? $p->last_name) ?: null,
+                            ])->filter()->implode(', ');
+                        ?>
+                        <option value="<?php echo e($p->id); ?>"><?php echo e($optionName); ?></option>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 </select>
             </div>
@@ -103,8 +112,21 @@
             <thead><tr><th>Partner</th><th>Period</th><th>Total</th><th>Generated</th><th></th></tr></thead>
             <tbody>
                 <?php $__empty_1 = true; $__currentLoopData = $statements; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $s): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php
+                        $partner = $s->partner;
+                        $hasSpouse = $partner && filled($partner->spouse_first_name);
+                        $rowName = $hasSpouse
+                            ? collect([
+                                $partner->title ?? null,
+                                $partner->first_name ?? null,
+                                $partner->spouse_title ?? null,
+                                $partner->spouse_first_name ?? null,
+                                ($partner->spouse_last_name ?? $partner->last_name) ?: null,
+                              ])->filter()->implode(', ')
+                            : $partner?->fullName();
+                    ?>
                     <tr>
-                        <td class="font-medium"><?php echo e($s->partner?->fullName()); ?></td>
+                        <td class="font-medium"><?php echo e($rowName); ?></td>
                         <td><?php echo e($s->period_start?->format('M j, Y') ?? '—'); ?> – <?php echo e($s->period_end?->format('M j, Y') ?? '—'); ?></td>
                         <td class="font-mono"><?php echo e(number_format($s->total_espees, 2)); ?></td>
                         <td><?php echo e($s->created_at->format('M j, Y g:ia')); ?></td>

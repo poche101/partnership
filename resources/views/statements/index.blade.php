@@ -13,7 +13,16 @@
                 <select name="partner_id" required class="field-input">
                     <option value="">Select partner…</option>
                     @foreach ($partners as $p)
-                        <option value="{{ $p->id }}">{{ trim($p->title.' '.$p->first_name.' '.$p->last_name) }}</option>
+                        @php
+                            $optionName = collect([
+                                $p->title ?? null,
+                                $p->first_name ?? null,
+                                $p->spouse_title ?? null,
+                                $p->spouse_first_name ?? null,
+                                ($p->spouse_last_name ?? $p->last_name) ?: null,
+                            ])->filter()->implode(', ');
+                        @endphp
+                        <option value="{{ $p->id }}">{{ $optionName }}</option>
                     @endforeach
                 </select>
             </div>
@@ -103,8 +112,21 @@
             <thead><tr><th>Partner</th><th>Period</th><th>Total</th><th>Generated</th><th></th></tr></thead>
             <tbody>
                 @forelse ($statements as $s)
+                    @php
+                        $partner = $s->partner;
+                        $hasSpouse = $partner && filled($partner->spouse_first_name);
+                        $rowName = $hasSpouse
+                            ? collect([
+                                $partner->title ?? null,
+                                $partner->first_name ?? null,
+                                $partner->spouse_title ?? null,
+                                $partner->spouse_first_name ?? null,
+                                ($partner->spouse_last_name ?? $partner->last_name) ?: null,
+                              ])->filter()->implode(', ')
+                            : $partner?->fullName();
+                    @endphp
                     <tr>
-                        <td class="font-medium">{{ $s->partner?->fullName() }}</td>
+                        <td class="font-medium">{{ $rowName }}</td>
                         <td>{{ $s->period_start?->format('M j, Y') ?? '—' }} – {{ $s->period_end?->format('M j, Y') ?? '—' }}</td>
                         <td class="font-mono">{{ number_format($s->total_espees, 2) }}</td>
                         <td>{{ $s->created_at->format('M j, Y g:ia') }}</td>

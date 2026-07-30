@@ -17,16 +17,15 @@
         @endforeach
     </div>
 
-    <div class="table-shell card mt-4 overflow-x-auto">
-        <table>
+    <div class="registry mt-6">
+        <table class="registry-table">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Church</th>
+                    <th>Partner</th>
                     <th>Category</th>
+                    <th>Contact</th>
                     <th>KingsChat</th>
-                    <th>Phone</th>
-                    <th>Email</th>
+                    <th>Spouse Contact</th>
                     <th>Last Giving</th>
                     <th>Amount</th>
                     <th></th>
@@ -36,22 +35,70 @@
                 @forelse ($view as $row)
                     @php
                         $partner = $row['entry']->partner;
-                        $spouseCompact = trim(($partner?->spouse_first_name ?? '').' '.($partner?->spouse_last_name ?? ''));
-                        $spouseTooltip = collect([$partner?->spouse_delegate_category, $partner?->spouse_kingschat, $partner?->spouse_phone, $partner?->spouse_email])
-                            ->filter()->implode(' · ');
+                        $hasSpouse = $partner && filled($partner->spouse_first_name);
+
+                        if ($hasSpouse) {
+                            $left = trim(($partner->title ?? '').' '.$partner->first_name);
+                            $right = trim(($partner->spouse_title ?? '').' '.$partner->spouse_first_name);
+                            $surname = $partner->spouse_last_name ?: $partner->last_name;
+                            $displayName = trim("{$left} & {$right} {$surname}");
+                        } else {
+                            $displayName = $partner?->fullName() ?? '—';
+                        }
+
+                        $initials = $partner
+                            ? strtoupper(mb_substr($partner->first_name ?? '?', 0, 1).mb_substr($partner->last_name ?? '', 0, 1))
+                            : '?';
+                        $palette = ['#3B5A73', '#7A5C3E', '#4E6E58', '#6B5B95', '#8A5A44', '#3E6B6B'];
+                        $swatch = $palette[crc32(($partner->id ?? 0).($partner->first_name ?? '')) % count($palette)];
+
+                        $spouseContactLines = collect([
+                            $partner?->spouse_kingschat ? '@'.$partner->spouse_kingschat : null,
+                            $partner?->spouse_phone,
+                            $partner?->spouse_email,
+                        ])->filter();
                     @endphp
                     <tr>
-                        <td class="font-medium">
-                            {{ $partner?->fullName() }}
-                            @if($spouseCompact)
-                                <span class="text-muted-foreground font-normal" title="{{ $spouseTooltip }}">&amp; {{ $spouseCompact }}</span>
+                        <td>
+                            <div class="registry-partner">
+                                <span class="registry-avatar" style="background: {{ $swatch }}">{{ $initials }}</span>
+                                <div class="registry-partner-text">
+                                    <div class="registry-name">{{ $displayName }}</div>
+                                    <div class="registry-church">{{ $row['entry']->church?->name ?? '—' }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            @if($partner?->delegate_category)
+                                <span class="badge">{{ $partner->delegate_category }}</span>
+                            @else
+                                <span class="registry-muted">—</span>
                             @endif
                         </td>
-                        <td>{{ $row['entry']->church?->name }}</td>
-                        <td>{{ $partner?->delegate_category ?: '—' }}</td>
-                        <td>{{ $partner?->kingschat_username ?: '—' }}</td>
-                        <td>{{ $partner?->phone ?: '—' }}</td>
-                        <td>{{ $partner?->email ?: '—' }}</td>
+                        <td>
+                            <div class="registry-stack">
+                                <span>{{ $partner?->phone ?: '—' }}</span>
+                                <span class="registry-muted">{{ $partner?->email ?: '—' }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            @if($partner?->kingschat_username)
+                                <span class="registry-handle">{{ '@'.$partner->kingschat_username }}</span>
+                            @else
+                                <span class="registry-muted">—</span>
+                            @endif
+                        </td>
+                        <td>
+                            @if($spouseContactLines->isNotEmpty())
+                                <div class="registry-stack">
+                                    @foreach ($spouseContactLines as $line)
+                                        <span>{{ $line }}</span>
+                                    @endforeach
+                                </div>
+                            @else
+                                <span class="registry-muted">—</span>
+                            @endif
+                        </td>
                         <td>{{ $row['entry']->recorded_at?->format('M j, Y') }}</td>
                         <td class="font-mono">{{ number_format($row['amount'], 2) }}</td>
                         <td>
@@ -62,7 +109,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="py-6 text-center text-muted-foreground">No givings recorded for this filter.</td></tr>
+                    <tr><td colspan="8" class="registry-empty">No givings recorded for this filter.</td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -146,4 +193,88 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
+
+<style>
+    .registry {
+        border: 1px solid var(--border, #E5E1D8);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--card, #fff);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .registry-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+    .registry-table thead th {
+        text-align: left;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted-foreground, #7A756B);
+        padding: 0.85rem 1.1rem;
+        border-bottom: 2px solid var(--border, #E5E1D8);
+        background: var(--muted, #FAFAF7);
+    }
+    .registry-table tbody tr {
+        border-bottom: 1px solid var(--border, #EEEBE3);
+        transition: background-color 0.12s ease;
+    }
+    .registry-table tbody tr:last-child { border-bottom: none; }
+    .registry-table tbody tr:hover { background: var(--muted, #FAFAF7); }
+    .registry-table td {
+        padding: 0.85rem 1.1rem;
+        vertical-align: middle;
+    }
+
+    .registry-partner {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+    }
+    .registry-avatar {
+        flex-shrink: 0;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+    .registry-partner-text { min-width: 0; }
+    .registry-name {
+        font-weight: 500;
+        color: var(--foreground, #1F1B16);
+        line-height: 1.3;
+    }
+    .registry-church {
+        font-size: 0.75rem;
+        color: var(--muted-foreground, #8A8578);
+        margin-top: 0.1rem;
+    }
+
+    .registry-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        line-height: 1.4;
+    }
+    .registry-muted { color: var(--muted-foreground, #B3AEA1); }
+    .registry-handle {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.8rem;
+        color: var(--primary, #3B5A73);
+    }
+    .registry-empty {
+        padding: 2.5rem 1rem;
+        text-align: center;
+        color: var(--muted-foreground, #B3AEA1);
+    }
+</style>
 @endsection
