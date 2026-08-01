@@ -16,3 +16,4 @@ yarn-error.log
 /auth.json
 bootstrap/cache/*.php
 storage/logs/*.log
+storage/framework/
