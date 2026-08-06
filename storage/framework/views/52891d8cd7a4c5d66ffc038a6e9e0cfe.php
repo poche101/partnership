@@ -1,13 +1,16 @@
 
 <?php $__env->startSection('title', 'Partners'); ?>
 <?php $__env->startSection('content'); ?>
-    <div class="mx-auto max-w-6xl px-6 py-8">
+    <?php
+        $titleOptions = ['Brother', 'Sister', 'Deacon', 'Deaconess', 'Pastor'];
+    ?>
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <h1 class="font-display text-2xl text-primary">Partners</h1>
+                <h1 class="font-display text-xl sm:text-2xl text-primary">Partners</h1>
                 <p class="mt-1 text-sm text-muted-foreground">All partners visible within your scope.</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
                 <a href="<?php echo e(route('partners.export')); ?>" class="btn-outline btn-icon">
                     <svg viewBox="0 0 20 20" fill="none" class="btn-svg">
                         <path d="M10 3v10m0 0l-4-4m4 4l4-4M4 16h12" stroke="currentColor" stroke-width="1.75"
@@ -21,7 +24,7 @@
 
         <form method="GET" class="mt-6 flex flex-wrap items-center gap-2">
             <input type="text" name="q" value="<?php echo e($q); ?>" placeholder="Search name, email, KingsChat..."
-                class="field-input max-w-sm">
+                class="field-input w-full sm:max-w-sm">
             <?php if(auth()->guard()->check()): ?>
                 <?php if(auth()->user()->isZoneAdmin()): ?>
                     <label class="flex items-center gap-2 text-sm text-muted-foreground">
@@ -33,157 +36,384 @@
         </form>
 
         <div class="registry mt-6">
-            <table class="registry-table">
-                <thead>
-                    <tr>
-                        <th>Partner</th>
-                        <th>Category</th>
-                        <th>Contact</th>
-                        <th>KingsChat</th>
-                        <th>Spouse Contact</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php $__empty_1 = true; $__currentLoopData = $partners; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                        <?php
-                            $hasSpouse = filled($p->spouse_first_name);
-
-                            if ($hasSpouse) {
-                                $left = trim(($p->title ?? '') . ' ' . $p->first_name);
-                                $right = trim(($p->spouse_title ?? '') . ' ' . $p->spouse_first_name);
-                                $surname = $p->spouse_last_name ?: $p->last_name;
-                                $displayName = trim("{$left} & {$right} {$surname}");
-                            } else {
-                                $displayName = $p->fullName();
-                            }
-
-                            $initials = strtoupper(
-                                mb_substr($p->first_name ?? '?', 0, 1) . mb_substr($p->last_name ?? '', 0, 1),
-                            );
-                            $palette = ['#3B5A73', '#7A5C3E', '#4E6E58', '#6B5B95', '#8A5A44', '#3E6B6B'];
-                            $swatch = $palette[crc32($p->id . $p->first_name) % count($palette)];
-
-                            $spouseContactLines = collect([
-                                $p->spouse_kingschat ? '@' . $p->spouse_kingschat : null,
-                                $p->spouse_phone,
-                                $p->spouse_email,
-                            ])->filter();
-                        ?>
-                        <tr>
-                            <td>
-                                <div class="registry-partner">
-                                    <span class="registry-avatar"
-                                        style="background: <?php echo e($swatch); ?>"><?php echo e($initials); ?></span>
-                                    <div class="registry-partner-text">
-                                        <div class="registry-name"><?php echo e($displayName); ?></div>
-                                        <div class="registry-church"><?php echo e($p->church?->name ?? '—'); ?></div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                <?php if($p->delegate_category): ?>
-                                    <span class="badge"><?php echo e($p->delegate_category); ?></span>
-                                <?php else: ?>
-                                    <span class="registry-muted">—</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <div class="registry-stack">
-                                    <span><?php echo e($p->phone ?: '—'); ?></span>
-                                    <span class="registry-muted"><?php echo e($p->email ?: '—'); ?></span>
-                                </div>
-                            </td>
-                            <td>
-                                <?php if($p->kingschat_username): ?>
-                                    <span class="registry-handle"><?php echo e('@' . $p->kingschat_username); ?></span>
-                                <?php else: ?>
-                                    <span class="registry-muted">—</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if($spouseContactLines->isNotEmpty()): ?>
-                                    <div class="registry-stack">
-                                        <?php $__currentLoopData = $spouseContactLines; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $line): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                            <span><?php echo e($line); ?></span>
-                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                    </div>
-                                <?php else: ?>
-                                    <span class="registry-muted">—</span>
-                                <?php endif; ?>
-                            </td>
+            <div class="registry-scroll">
+                <table class="registry-table">
+                    <thead>
+                        <tr class="registry-group-row">
+                            <th colspan="5" class="registry-group-header registry-group-partner">Partner Details</th>
+                            <th colspan="5" class="registry-group-header registry-group-spouse">Spouse Details</th>
+                            <th rowspan="2" class="registry-group-header registry-group-actions">Actions</th>
                         </tr>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <tr>
-                            <td colspan="5" class="registry-empty">No partners found.</td>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                            <th>KingsChat</th>
+                            <th class="registry-divider">Name</th>
+                            <th>Category</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                            <th>KingsChat</th>
                         </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php $__empty_1 = true; $__currentLoopData = $partners; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                            <?php
+                                $hasSpouse = filled($p->spouse_first_name);
+
+                                $partnerName = trim(($p->title ?? '') . ' ' . $p->first_name . ' ' . $p->last_name);
+
+                                $spouseName = $hasSpouse
+                                    ? trim(
+                                        ($p->spouse_title ?? '') .
+                                            ' ' .
+                                            $p->spouse_first_name .
+                                            ' ' .
+                                            ($p->spouse_last_name ?: $p->last_name),
+                                    )
+                                    : null;
+
+                                $initials = strtoupper(
+                                    mb_substr($p->first_name ?? '?', 0, 1) . mb_substr($p->last_name ?? '', 0, 1),
+                                );
+                                $palette = ['#3B5A73', '#7A5C3E', '#4E6E58', '#6B5B95', '#8A5A44', '#3E6B6B'];
+                                $swatch = $palette[crc32($p->id . $p->first_name) % count($palette)];
+                            ?>
+                            <tr>
+                                
+                                <td>
+                                    <div class="registry-partner">
+                                        <span class="registry-avatar"
+                                            style="background: <?php echo e($swatch); ?>"><?php echo e($initials); ?></span>
+                                        <div class="registry-partner-text">
+                                            <div class="registry-name"><?php echo e($partnerName); ?></div>
+                                            <div class="registry-church"><?php echo e($p->church?->name ?? '—'); ?></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                
+                                <td>
+                                    <?php if($p->delegate_category): ?>
+                                        <span class="badge"><?php echo e($p->delegate_category); ?></span>
+                                    <?php else: ?>
+                                        <span class="registry-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <td><?php echo e($p->phone ?: '—'); ?></td>
+                                
+                                <td><?php echo e($p->email ?: '—'); ?></td>
+                                
+                                <td>
+                                    <?php if($p->kingschat_username): ?>
+                                        <span class="registry-handle"><?php echo e('@' . $p->kingschat_username); ?></span>
+                                    <?php else: ?>
+                                        <span class="registry-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                
+                                <td class="registry-divider">
+                                    <?php if($hasSpouse): ?>
+                                        <div class="registry-name"><?php echo e($spouseName); ?></div>
+                                    <?php else: ?>
+                                        <span class="registry-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <td>
+                                    <?php if($hasSpouse && !empty($p->spouse_delegate_category)): ?>
+                                        <span class="badge"><?php echo e($p->spouse_delegate_category); ?></span>
+                                    <?php else: ?>
+                                        <span class="registry-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <td><?php echo e($hasSpouse && $p->spouse_phone ? $p->spouse_phone : '—'); ?></td>
+                                
+                                <td><?php echo e($hasSpouse && $p->spouse_email ? $p->spouse_email : '—'); ?></td>
+                                
+                                <td>
+                                    <?php if($hasSpouse && $p->spouse_kingschat): ?>
+                                        <span class="registry-handle"><?php echo e('@' . $p->spouse_kingschat); ?></span>
+                                    <?php else: ?>
+                                        <span class="registry-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                
+                                <td>
+                                    <div class="registry-actions">
+                                        <button type="button" data-open-modal="edit-partner-<?php echo e($p->id); ?>"
+                                            class="btn-icon-only" title="Edit partner">
+                                            <svg viewBox="0 0 20 20" fill="none" class="btn-svg">
+                                                <path
+                                                    d="M13.5 3.5l3 3L6 17H3v-3L13.5 3.5z"
+                                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                                    stroke-linejoin="round" />
+                                            </svg>
+                                        </button>
+                                        <button type="button" data-open-modal="delete-partner-<?php echo e($p->id); ?>"
+                                            class="btn-icon-only btn-icon-danger" title="Delete partner">
+                                            <svg viewBox="0 0 20 20" fill="none" class="btn-svg">
+                                                <path
+                                                    d="M4 6h12M8 6V4.5A1.5 1.5 0 019.5 3h1A1.5 1.5 0 0112 4.5V6m-6.5 0l.6 9.4a1.5 1.5 0 001.5 1.6h3.8a1.5 1.5 0 001.5-1.6L14.5 6"
+                                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                                    stroke-linejoin="round" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                            <tr>
+                                <td colspan="11" class="registry-empty">No partners found.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <div id="new-partner" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4 overflow-y-auto">
-        <div class="card my-8 w-full max-w-2xl p-6">
-            <h2 class="font-display text-lg text-primary">New Partner</h2>
-            <form method="POST" action="<?php echo e(route('partners.store')); ?>" class="mt-4 space-y-4">
-                <?php echo csrf_field(); ?>
-                <?php if($churches->count() > 1 || !auth()->user()->isChurchAdmin()): ?>
-                    <div>
-                        <label class="field-label">Church</label>
-                        <select name="church_id" required class="field-input">
-                            <?php $__currentLoopData = $churches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $c): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                <option value="<?php echo e($c->id); ?>"><?php echo e($c->name); ?></option>
-                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                        </select>
-                    </div>
-                <?php endif; ?>
-                <div class="grid grid-cols-3 gap-3">
-                    <div><label class="field-label">Title</label><input name="title" class="field-input"></div>
-                    <div class="col-span-1"><label class="field-label">First name</label><input name="first_name" required
-                            class="field-input"></div>
-                    <div><label class="field-label">Last name</label><input name="last_name" class="field-input"></div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="field-label">Delegate category</label>
-                        <select name="delegate_category" class="field-input">
-                            <option value="">—</option>
-                            <?php $__currentLoopData = $delegateCategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $dc): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                <option value="<?php echo e($dc); ?>"><?php echo e($dc); ?></option>
-                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                        </select>
-                    </div>
-                    <div><label class="field-label">KingsChat username</label><input name="kingschat_username"
-                            class="field-input"></div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><label class="field-label">Phone</label><input name="phone" class="field-input"></div>
-                    <div><label class="field-label">Email</label><input type="email" name="email" class="field-input">
-                    </div>
-                </div>
-                <details class="rounded-md border border-border p-3">
-                    <summary class="cursor-pointer text-sm font-medium text-foreground">Spouse details (optional)</summary>
-                    <div class="mt-3 grid grid-cols-3 gap-3">
-                        <div><label class="field-label">Title</label><input name="spouse_title" class="field-input"></div>
-                        <div><label class="field-label">First name</label><input name="spouse_first_name"
-                                class="field-input"></div>
-                        <div><label class="field-label">Surname</label><input name="spouse_last_name" class="field-input">
+    
+    <?php $__currentLoopData = $partners; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+        <?php
+            $hasSpouse = filled($p->spouse_first_name);
+            $partnerName = trim(($p->title ?? '') . ' ' . $p->first_name . ' ' . $p->last_name);
+        ?>
+
+        
+        <div id="edit-partner-<?php echo e($p->id); ?>" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/40">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="card w-full max-w-2xl p-4 sm:p-6">
+                    <h2 class="font-display text-lg text-primary">Edit Partner</h2>
+                    <form method="POST" action="<?php echo e(route('partners.update', $p)); ?>" class="mt-4 space-y-4">
+                        <?php echo csrf_field(); ?>
+                        <?php echo method_field('PUT'); ?>
+                        <?php if($churches->count() > 1 || !auth()->user()->isChurchAdmin()): ?>
+                            <div>
+                                <label class="field-label">Church</label>
+                                <select name="church_id" required class="field-input">
+                                    <?php $__currentLoopData = $churches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $c): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($c->id); ?>"
+                                            <?php echo e($p->church_id == $c->id ? 'selected' : ''); ?>>
+                                            <?php echo e($c->name); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                            </div>
+                        <?php endif; ?>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="field-label">Title</label>
+                                <select name="title" class="field-input">
+                                    <option value="">—</option>
+                                    <?php $__currentLoopData = $titleOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($t); ?>" <?php echo e($p->title === $t ? 'selected' : ''); ?>>
+                                            <?php echo e($t); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                            </div>
+                            <div class="sm:col-span-1"><label class="field-label">First name</label><input
+                                    name="first_name" required value="<?php echo e($p->first_name); ?>" class="field-input">
+                            </div>
+                            <div><label class="field-label">Last name</label><input name="last_name"
+                                    value="<?php echo e($p->last_name); ?>" class="field-input"></div>
                         </div>
-                    </div>
-                    <div class="mt-3 grid grid-cols-2 gap-3">
-                        <div><label class="field-label">KingsChat</label><input name="spouse_kingschat"
-                                class="field-input"></div>
-                        <div><label class="field-label">Phone</label><input name="spouse_phone" class="field-input">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="field-label">Delegate category</label>
+                                <select name="delegate_category" class="field-input">
+                                    <option value="">—</option>
+                                    <?php $__currentLoopData = $delegateCategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $dc): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($dc); ?>"
+                                            <?php echo e($p->delegate_category === $dc ? 'selected' : ''); ?>><?php echo e($dc); ?>
+
+                                        </option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                            </div>
+                            <div><label class="field-label">KingsChat username</label><input
+                                    name="kingschat_username" value="<?php echo e($p->kingschat_username); ?>"
+                                    class="field-input"></div>
                         </div>
-                    </div>
-                    <div class="mt-3"><label class="field-label">Email</label><input type="email"
-                            name="spouse_email" class="field-input"></div>
-                </details>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" data-close-modal="new-partner" class="btn-outline">Cancel</button>
-                    <button type="submit" class="btn-primary">Save Partner</button>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div><label class="field-label">Phone</label><input name="phone"
+                                    value="<?php echo e($p->phone); ?>" class="field-input"></div>
+                            <div><label class="field-label">Email</label><input type="email" name="email"
+                                    value="<?php echo e($p->email); ?>" class="field-input"></div>
+                        </div>
+                        <details class="rounded-md border border-border p-3" <?php echo e($hasSpouse ? 'open' : ''); ?>>
+                            <summary class="cursor-pointer text-sm font-medium text-foreground">Spouse details
+                                (optional)</summary>
+                            <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="field-label">Title</label>
+                                    <select name="spouse_title" class="field-input">
+                                        <option value="">—</option>
+                                        <?php $__currentLoopData = $titleOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <option value="<?php echo e($t); ?>"
+                                                <?php echo e($p->spouse_title === $t ? 'selected' : ''); ?>><?php echo e($t); ?>
+
+                                            </option>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </select>
+                                </div>
+                                <div><label class="field-label">First name</label><input
+                                        name="spouse_first_name" value="<?php echo e($p->spouse_first_name); ?>"
+                                        class="field-input"></div>
+                                <div><label class="field-label">Surname</label><input name="spouse_last_name"
+                                        value="<?php echo e($p->spouse_last_name); ?>" class="field-input"></div>
+                            </div>
+                            <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="field-label">Spouse delegate category</label>
+                                    <select name="spouse_delegate_category" class="field-input">
+                                        <option value="">—</option>
+                                        <?php $__currentLoopData = $delegateCategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $dc): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <option value="<?php echo e($dc); ?>"
+                                                <?php echo e($p->spouse_delegate_category === $dc ? 'selected' : ''); ?>>
+                                                <?php echo e($dc); ?></option>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </select>
+                                </div>
+                                <div><label class="field-label">KingsChat</label><input name="spouse_kingschat"
+                                        value="<?php echo e($p->spouse_kingschat); ?>" class="field-input"></div>
+                            </div>
+                            <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div><label class="field-label">Phone</label><input name="spouse_phone"
+                                        value="<?php echo e($p->spouse_phone); ?>" class="field-input"></div>
+                                <div><label class="field-label">Email</label><input type="email"
+                                        name="spouse_email" value="<?php echo e($p->spouse_email); ?>" class="field-input">
+                                </div>
+                            </div>
+                        </details>
+                        <div class="flex flex-wrap justify-end gap-2 pt-2">
+                            <button type="button" data-close-modal="edit-partner-<?php echo e($p->id); ?>"
+                                class="btn-outline">Cancel</button>
+                            <button type="submit" class="btn-primary">Save Changes</button>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
+        </div>
+
+        
+        <div id="delete-partner-<?php echo e($p->id); ?>" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/40">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="card w-full max-w-md p-4 sm:p-6">
+                    <h2 class="font-display text-lg text-primary">Delete Partner</h2>
+                    <p class="mt-2 text-sm text-muted-foreground">
+                        Are you sure you want to delete <strong><?php echo e($partnerName); ?></strong>?
+                        This action cannot be undone.
+                    </p>
+                    <form method="POST" action="<?php echo e(route('partners.destroy', $p)); ?>"
+                        class="mt-6 flex flex-wrap justify-end gap-2">
+                        <?php echo csrf_field(); ?>
+                        <?php echo method_field('DELETE'); ?>
+                        <button type="button" data-close-modal="delete-partner-<?php echo e($p->id); ?>"
+                            class="btn-outline">Cancel</button>
+                        <button type="submit" class="btn-primary btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+
+    <div id="new-partner" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/40">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="card w-full max-w-2xl p-4 sm:p-6">
+                <h2 class="font-display text-lg text-primary">New Partner</h2>
+                <form method="POST" action="<?php echo e(route('partners.store')); ?>" class="mt-4 space-y-4">
+                    <?php echo csrf_field(); ?>
+                    <?php if($churches->count() > 1 || !auth()->user()->isChurchAdmin()): ?>
+                        <div>
+                            <label class="field-label">Church</label>
+                            <select name="church_id" required class="field-input">
+                                <?php $__currentLoopData = $churches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $c): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($c->id); ?>"><?php echo e($c->name); ?></option>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </select>
+                        </div>
+                    <?php endif; ?>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="field-label">Title</label>
+                            <select name="title" class="field-input">
+                                <option value="">—</option>
+                                <?php $__currentLoopData = $titleOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($t); ?>"><?php echo e($t); ?></option>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-1"><label class="field-label">First name</label><input
+                                name="first_name" required class="field-input"></div>
+                        <div><label class="field-label">Last name</label><input name="last_name"
+                                class="field-input"></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="field-label">Delegate category</label>
+                            <select name="delegate_category" class="field-input">
+                                <option value="">—</option>
+                                <?php $__currentLoopData = $delegateCategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $dc): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($dc); ?>"><?php echo e($dc); ?></option>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </select>
+                        </div>
+                        <div><label class="field-label">KingsChat username</label><input name="kingschat_username"
+                                class="field-input"></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label class="field-label">Phone</label><input name="phone" class="field-input"></div>
+                        <div><label class="field-label">Email</label><input type="email" name="email"
+                                class="field-input"></div>
+                    </div>
+                    <details class="rounded-md border border-border p-3">
+                        <summary class="cursor-pointer text-sm font-medium text-foreground">Spouse details
+                            (optional)</summary>
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="field-label">Title</label>
+                                <select name="spouse_title" class="field-input">
+                                    <option value="">—</option>
+                                    <?php $__currentLoopData = $titleOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($t); ?>"><?php echo e($t); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                            </div>
+                            <div><label class="field-label">First name</label><input name="spouse_first_name"
+                                    class="field-input"></div>
+                            <div><label class="field-label">Surname</label><input name="spouse_last_name"
+                                    class="field-input"></div>
+                        </div>
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="field-label">Spouse delegate category</label>
+                                <select name="spouse_delegate_category" class="field-input">
+                                    <option value="">—</option>
+                                    <?php $__currentLoopData = $delegateCategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $dc): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($dc); ?>"><?php echo e($dc); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                            </div>
+                            <div><label class="field-label">KingsChat</label><input name="spouse_kingschat"
+                                    class="field-input"></div>
+                        </div>
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div><label class="field-label">Phone</label><input name="spouse_phone"
+                                    class="field-input"></div>
+                            <div><label class="field-label">Email</label><input type="email" name="spouse_email"
+                                    class="field-input"></div>
+                        </div>
+                    </details>
+                    <div class="flex flex-wrap justify-end gap-2 pt-2">
+                        <button type="button" data-close-modal="new-partner" class="btn-outline">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Partner</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -196,8 +426,25 @@
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
         }
 
+        /* Horizontal auto-scroll wrapper for the wider two-block table */
+        .registry-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+
+        .registry-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .registry-scroll::-webkit-scrollbar-thumb {
+            background: var(--border, #E5E1D8);
+            border-radius: 999px;
+        }
+
         .registry-table {
             width: 100%;
+            min-width: 1200px;
             border-collapse: collapse;
             font-size: 0.875rem;
         }
@@ -209,9 +456,32 @@
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: var(--muted-foreground, #7A756B);
-            padding: 0.85rem 1.1rem;
+            padding: 0.7rem 1.1rem;
             border-bottom: 2px solid var(--border, #E5E1D8);
             background: var(--muted, #FAFAF7);
+            white-space: nowrap;
+        }
+
+        .registry-group-header {
+            text-align: center;
+            font-size: 0.72rem;
+            padding: 0.6rem 1.1rem;
+            border-bottom: 1px solid var(--border, #E5E1D8);
+        }
+
+        .registry-group-partner {
+            background: var(--muted, #F3F2ED);
+            color: var(--primary, #3B5A73);
+        }
+
+        .registry-group-spouse {
+            background: #EFE9E0;
+            color: #7A5C3E;
+        }
+
+        .registry-group-actions {
+            background: var(--muted, #F3F2ED);
+            color: var(--muted-foreground, #7A756B);
         }
 
         .registry-table tbody tr {
@@ -230,6 +500,12 @@
         .registry-table td {
             padding: 0.85rem 1.1rem;
             vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        /* Visual separation between the Partner block and the Spouse block */
+        .registry-divider {
+            border-left: 2px solid var(--border, #E5E1D8);
         }
 
         .registry-partner {
@@ -268,13 +544,6 @@
             margin-top: 0.1rem;
         }
 
-        .registry-stack {
-            display: flex;
-            flex-direction: column;
-            gap: 0.15rem;
-            line-height: 1.4;
-        }
-
         .registry-muted {
             color: var(--muted-foreground, #B3AEA1);
         }
@@ -290,7 +559,64 @@
             text-align: center;
             color: var(--muted-foreground, #B3AEA1);
         }
+
+        .registry-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-icon-only {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: 1px solid var(--border, #E5E1D8);
+            background: var(--card, #fff);
+            color: var(--muted-foreground, #7A756B);
+            cursor: pointer;
+            transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+        }
+
+        .btn-icon-only:hover {
+            background: var(--muted, #FAFAF7);
+            color: var(--primary, #3B5A73);
+            border-color: var(--primary, #3B5A73);
+        }
+
+        .btn-icon-danger:hover {
+            color: #B3261E;
+            border-color: #B3261E;
+            background: #FBEAE9;
+        }
+
+        .btn-icon-only .btn-svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .btn-danger {
+            background: #B3261E;
+            border-color: #B3261E;
+        }
+
+        .btn-danger:hover {
+            background: #922019;
+            border-color: #922019;
+        }
+
+        @media (max-width: 480px) {
+            .registry-actions {
+                gap: 0.3rem;
+            }
+
+            .btn-icon-only {
+                width: 30px;
+                height: 30px;
+            }
+        }
     </style>
 <?php $__env->stopSection(); ?>
-
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\kings\partnership\partnership\resources\views/partners/index.blade.php ENDPATH**/ ?>

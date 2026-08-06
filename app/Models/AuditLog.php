@@ -10,8 +10,8 @@ class AuditLog extends Model
 
     protected $fillable = ['actor_id', 'actor_email', 'church_id', 'action', 'entity_type', 'entity_id', 'details', 'created_at'];
 
-    protected function casts(): array
-    {
-        return ['details' => 'array', 'created_at' => 'datetime'];
-    }
+    protected $casts = [
+        'details' => 'array',
+        'created_at' => 'datetime',
+    ];
 }

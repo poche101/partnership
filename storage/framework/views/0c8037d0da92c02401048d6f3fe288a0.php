@@ -176,5 +176,7 @@
             <?php echo $__env->yieldContent('content'); ?>
         </main>
     </div>
+
+    <?php echo $__env->yieldPushContent('scripts'); ?>
 </body>
 </html><?php /**PATH C:\Users\kings\partnership\partnership\resources\views/layouts/app.blade.php ENDPATH**/ ?>

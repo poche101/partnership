@@ -1,8 +1,8 @@
 
 <?php $__env->startSection('title', 'Audit Logs'); ?>
 <?php $__env->startSection('content'); ?>
-<div class="mx-auto max-w-4xl px-6 py-8">
-    <h1 class="font-display text-2xl text-primary">Audit Logs</h1>
+<div class="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+    <h1 class="font-display text-xl sm:text-2xl text-primary">Audit Logs</h1>
     <p class="mt-1 text-sm text-muted-foreground">
         <?php if(request()->filled('entity_type') || request()->filled('entity_id')): ?>
             Filtered activity trail.
@@ -12,25 +12,64 @@
         <?php endif; ?>
     </p>
 
-    <form method="GET" action="<?php echo e(route('audit.index')); ?>" class="mt-4 flex gap-2">
+    <form method="GET" action="<?php echo e(route('audit.index')); ?>" class="mt-4 flex flex-wrap items-end gap-2">
         <?php if(request()->filled('entity_type')): ?>
             <input type="hidden" name="entity_type" value="<?php echo e(request('entity_type')); ?>">
         <?php endif; ?>
         <?php if(request()->filled('entity_id')): ?>
             <input type="hidden" name="entity_id" value="<?php echo e(request('entity_id')); ?>">
         <?php endif; ?>
-        <input
-            type="text"
-            name="q"
-            value="<?php echo e(request('q')); ?>"
-            placeholder="Search by actor, action, or partner…"
-            class="field-input flex-1"
-        >
+
+        <div class="flex flex-1 min-w-[200px] flex-col">
+            <label for="q" class="mb-1 text-xs text-muted-foreground">Search</label>
+            <input
+                type="text"
+                name="q"
+                id="q"
+                value="<?php echo e(request('q')); ?>"
+                placeholder="Actor, action, partner, or arm…"
+                class="field-input"
+            >
+        </div>
+
+        <div class="flex flex-col">
+            <label for="date_from" class="mb-1 text-xs text-muted-foreground">From</label>
+            <input type="date" name="date_from" id="date_from" value="<?php echo e(request('date_from')); ?>"
+                class="field-input">
+        </div>
+
+        <div class="flex flex-col">
+            <label for="date_to" class="mb-1 text-xs text-muted-foreground">To</label>
+            <input type="date" name="date_to" id="date_to" value="<?php echo e(request('date_to')); ?>" class="field-input">
+        </div>
+
         <button type="submit" class="btn-primary">Search</button>
-        <?php if(request()->filled('q')): ?>
-            <a href="<?php echo e(route('audit.index', request()->except('q'))); ?>" class="btn-outline">Clear</a>
+
+        <?php if(request()->filled('q') || request()->filled('date_from') || request()->filled('date_to')): ?>
+            <a href="<?php echo e(route('audit.index', request()->only(['entity_type', 'entity_id']))); ?>"
+                class="btn-outline">Clear</a>
         <?php endif; ?>
     </form>
+
+    <?php if(request()->filled('q') || request()->filled('date_from') || request()->filled('date_to')): ?>
+        <?php
+            $resultCount = method_exists($logs, 'total') ? $logs->total() : $logs->count();
+        ?>
+        <p class="mt-4 text-sm text-muted-foreground">
+            <strong class="text-foreground"><?php echo e(number_format($resultCount)); ?></strong>
+            <?php echo e(Str::plural('result', $resultCount)); ?>
+
+            <?php if(request()->filled('q')): ?>
+                for "<strong class="text-foreground"><?php echo e(request('q')); ?></strong>"
+            <?php endif; ?>
+            <?php if(request()->filled('date_from') || request()->filled('date_to')): ?>
+                between
+                <strong class="text-foreground"><?php echo e(request('date_from') ?: 'the start'); ?></strong>
+                and
+                <strong class="text-foreground"><?php echo e(request('date_to') ?: 'now'); ?></strong>
+            <?php endif; ?>
+        </p>
+    <?php endif; ?>
 
     <div class="mt-6 space-y-3">
         <?php $__empty_1 = true; $__currentLoopData = $logs; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $log): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
@@ -78,12 +117,40 @@
                                         <span class="font-medium text-foreground"><?php echo e(\App\Support\Arms::label($arm)); ?>:</span>
                                         <?php echo e(number_format($change['before'], 2)); ?>
 
-                                        <span class="text-primary">+<?php echo e(number_format($change['added'], 2)); ?></span>
+                                        <?php if(array_key_exists('added', $change)): ?>
+                                            <span class="text-primary">+<?php echo e(number_format($change['added'], 2)); ?></span>
+                                        <?php endif; ?>
                                         &rarr; <?php echo e(number_format($change['after'], 2)); ?> ESPEES
                                     </li>
                                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </ul>
                         <?php endif; ?>
+                    <?php elseif($log->action === 'giving.updated'): ?>
+                        <?php $d = $log->details ?? []; ?>
+                        <p>
+                            Updated a giving record for <strong><?php echo e($d['partner'] ?? 'Unknown partner'); ?></strong>.
+                        </p>
+                        <?php if(!empty($d['changes'])): ?>
+                            <ul class="mt-2 space-y-1 text-muted-foreground">
+                                <?php $__currentLoopData = $d['changes']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $arm => $change): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <span class="font-medium text-foreground"><?php echo e(\App\Support\Arms::label($arm)); ?>:</span>
+                                        <?php echo e(number_format($change['before'], 2)); ?>
+
+                                        &rarr; <?php echo e(number_format($change['after'], 2)); ?> ESPEES
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
+                        <?php endif; ?>
+                    <?php elseif($log->action === 'giving.deleted'): ?>
+                        <?php $d = $log->details ?? []; ?>
+                        <p>
+                            Deleted a giving record for <strong><?php echo e($d['partner'] ?? 'Unknown partner'); ?></strong>
+                            <?php if(isset($d['total_espees'])): ?>
+                                totaling <?php echo e(number_format($d['total_espees'], 2)); ?> ESPEES
+                            <?php endif; ?>
+                            .
+                        </p>
                     <?php else: ?>
                         <p class="text-muted-foreground">
                             <?php echo e($log->entity_type ? class_basename($log->entity_type) : 'Entity'); ?>
@@ -107,8 +174,8 @@
             </div>
         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
             <div class="card p-6 text-center text-muted-foreground">
-                <?php if(request()->filled('q')): ?>
-                    No activity matches "<?php echo e(request('q')); ?>".
+                <?php if(request()->filled('q') || request()->filled('date_from') || request()->filled('date_to')): ?>
+                    No activity matches your filters.
                 <?php else: ?>
                     No activity recorded yet.
                 <?php endif; ?>
@@ -117,7 +184,7 @@
     </div>
 
     <div class="mt-6">
-        <?php echo e($logs->links()); ?>
+        <?php echo e($logs->appends(request()->query())->links()); ?>
 
     </div>
 </div>

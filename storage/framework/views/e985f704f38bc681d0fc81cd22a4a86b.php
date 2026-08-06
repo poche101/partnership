@@ -64,30 +64,34 @@
 </div>
 
 <?php if(count($series)): ?>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<?php $__env->startPush('scripts'); ?>
 <script>
-    const ctx = document.getElementById('trendChart');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: <?php echo json_encode(collect($series)->pluck('date'), 15, 512) ?>,
-            datasets: [{
-                label: 'ESPEES',
-                data: <?php echo json_encode(collect($series)->pluck('total'), 15, 512) ?>,
-                borderColor: '#B98D4C',
-                backgroundColor: 'rgba(185,141,76,0.15)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 0,
-            }],
-        },
-        options: {
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } },
-        },
+    document.addEventListener('DOMContentLoaded', () => {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx || typeof window.Chart === 'undefined') return;
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: <?php echo json_encode(collect($series)->pluck('date'), 15, 512) ?>,
+                datasets: [{
+                    label: 'ESPEES',
+                    data: <?php echo json_encode(collect($series)->pluck('total'), 15, 512) ?>,
+                    borderColor: '#B98D4C',
+                    backgroundColor: 'rgba(185,141,76,0.15)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                }],
+            },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } },
+            },
+        });
     });
 </script>
+<?php $__env->stopPush(); ?>
 <?php endif; ?>
 <?php $__env->stopSection(); ?>
-
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\kings\partnership\partnership\resources\views/dashboard/index.blade.php ENDPATH**/ ?>
