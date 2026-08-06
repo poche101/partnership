@@ -64,7 +64,77 @@ class PartnerController extends Controller
     {
         $user = Auth::user();
 
-        $data = $request->validate([
+        $data = $this->validatePartnerData($request);
+
+        $churchId = $user->isChurchAdmin() ? $user->church_id : ($data['church_id'] ?? null);
+        if (! $churchId) {
+            return back()->withErrors(['church_id' => 'Select a church.'])->withInput();
+        }
+        if ($user->isGroupAdmin() && ! Church::where('id', $churchId)->where('group_church_id', $user->group_church_id)->exists()) {
+            abort(403);
+        }
+
+        unset($data['church_id']);
+        $data['church_id'] = $churchId;
+
+        // Keep spouse_name (used by the Givings statement/table) in sync with
+        // the detailed spouse fields collected here, so a partner created via
+        // this form shows their spouse consistently everywhere.
+        $data['spouse_name'] = $this->buildSpouseName($data);
+
+        Partner::create($data);
+
+        return back()->with('success', 'Partner added.');
+    }
+
+    public function update(Request $request, Partner $partner)
+    {
+        $user = Auth::user();
+        $this->authorizePartnerAccess($user, $partner);
+
+        $data = $this->validatePartnerData($request);
+
+        $churchId = $user->isChurchAdmin() ? $user->church_id : ($data['church_id'] ?? $partner->church_id);
+        if (! $churchId) {
+            return back()->withErrors(['church_id' => 'Select a church.'])->withInput();
+        }
+        if ($user->isGroupAdmin() && ! Church::where('id', $churchId)->where('group_church_id', $user->group_church_id)->exists()) {
+            abort(403);
+        }
+
+        unset($data['church_id']);
+        $data['church_id'] = $churchId;
+
+        // Keep spouse_name in sync — including clearing it back out if the
+        // spouse fields were emptied on this edit.
+        $data['spouse_name'] = $this->buildSpouseName($data);
+
+        $partner->update($data);
+
+        return back()->with('success', 'Partner updated.');
+    }
+
+    public function destroy(Partner $partner)
+    {
+        $user = Auth::user();
+        $this->authorizePartnerAccess($user, $partner);
+
+        $partner->delete();
+
+        return back()->with('success', 'Partner deleted.');
+    }
+
+    public function export()
+    {
+        return Excel::download(new PartnersExport, 'partners-'.now()->format('Y-m-d').'.xlsx');
+    }
+
+    /**
+     * Shared validation rules for the create and edit partner forms.
+     */
+    private function validatePartnerData(Request $request): array
+    {
+        return $request->validate([
             'title' => ['nullable', 'string', 'max:100'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['nullable', 'string', 'max:255'],
@@ -81,34 +151,29 @@ class PartnerController extends Controller
             'spouse_phone' => ['nullable', 'string', 'max:50'],
             'spouse_email' => ['nullable', 'email', 'max:255'],
         ]);
-
-        $churchId = $user->isChurchAdmin() ? $user->church_id : ($data['church_id'] ?? null);
-        if (! $churchId) {
-            return back()->withErrors(['church_id' => 'Select a church.'])->withInput();
-        }
-        if ($user->isGroupAdmin() && ! Church::where('id', $churchId)->where('group_church_id', $user->group_church_id)->exists()) {
-            abort(403);
-        }
-
-        unset($data['church_id']);
-        $data['church_id'] = $churchId;
-
-        // Keep spouse_name (used by the Givings statement/table) in sync with
-        // the detailed spouse fields collected here, so a partner created via
-        // this form shows their spouse consistently everywhere.
-        $spouseName = trim(($data['spouse_title'] ?? '').' '.($data['spouse_first_name'] ?? '').' '.($data['spouse_last_name'] ?? ''));
-        $spouseName = preg_replace('/\s+/', ' ', $spouseName);
-        if ($spouseName !== '') {
-            $data['spouse_name'] = $spouseName;
-        }
-
-        Partner::create($data);
-
-        return back()->with('success', 'Partner added.');
     }
 
-    public function export()
+    /**
+     * Builds the flat spouse_name string (used by the Givings statement/table)
+     * from the detailed spouse fields. Returns '' when no spouse fields are set,
+     * so updates correctly clear spouse_name if the spouse details are removed.
+     */
+    private function buildSpouseName(array $data): string
     {
-        return Excel::download(new PartnersExport, 'partners-'.now()->format('Y-m-d').'.xlsx');
+        $spouseName = trim(($data['spouse_title'] ?? '').' '.($data['spouse_first_name'] ?? '').' '.($data['spouse_last_name'] ?? ''));
+
+        return preg_replace('/\s+/', ' ', $spouseName);
+    }
+
+    /**
+     * Ensures the authenticated user is allowed to modify the given partner,
+     * i.e. the partner's church is within the user's visible scope.
+     */
+    private function authorizePartnerAccess($user, Partner $partner): void
+    {
+        $churchIds = $user->visibleChurchIds();
+        if ($churchIds !== null && ! in_array($partner->church_id, $churchIds, true)) {
+            abort(403);
+        }
     }
 }

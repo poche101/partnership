@@ -141,4 +141,92 @@ class GivingController extends Controller
 
         return back()->with('success', 'Giving recorded.');
     }
+
+    public function update(Request $request, PartnershipEntry $entry)
+    {
+        $user = Auth::user();
+        $this->authorizeEntryAccess($user, $entry);
+
+        $data = $request->validate([
+            'note' => ['nullable', 'string'],
+            ...collect(PartnershipEntry::ARM_KEYS)->mapWithKeys(fn ($k) => [$k => ['nullable', 'numeric', 'min:0']])->all(),
+        ]);
+
+        DB::transaction(function () use ($entry, $user, $data) {
+            $entry = PartnershipEntry::where('id', $entry->id)->lockForUpdate()->firstOrFail();
+
+            // Unlike store() (which increments each arm), an edit sets each
+            // arm to the exact value submitted — the form shows the current
+            // absolute amounts, so whatever comes back replaces them.
+            $changes = [];
+            foreach (PartnershipEntry::ARM_KEYS as $key) {
+                $before = (float) $entry->{$key};
+                $after = (float) ($data[$key] ?? 0);
+                if ($before !== $after) {
+                    $changes[$key] = ['before' => $before, 'after' => $after];
+                }
+                $entry->{$key} = $after;
+            }
+
+            $entry->total_espees = collect(PartnershipEntry::ARM_KEYS)->sum(fn ($k) => (float) $entry->{$k});
+            $entry->note = $data['note'] ?? null;
+            $entry->save();
+
+            if (! empty($changes)) {
+                AuditLog::create([
+                    'actor_id' => $user->id,
+                    'actor_email' => $user->email,
+                    'church_id' => $entry->church_id,
+                    'action' => 'giving.updated',
+                    'entity_type' => PartnershipEntry::class,
+                    'entity_id' => $entry->id,
+                    'details' => [
+                        'partner_id' => $entry->partner_id,
+                        'partner' => $entry->partner?->fullName(),
+                        'changes' => $changes,
+                    ],
+                ]);
+            }
+        });
+
+        return back()->with('success', 'Giving record updated.');
+    }
+
+    public function destroy(PartnershipEntry $entry)
+    {
+        $user = Auth::user();
+        $this->authorizeEntryAccess($user, $entry);
+
+        DB::transaction(function () use ($entry, $user) {
+            AuditLog::create([
+                'actor_id' => $user->id,
+                'actor_email' => $user->email,
+                'church_id' => $entry->church_id,
+                'action' => 'giving.deleted',
+                'entity_type' => PartnershipEntry::class,
+                'entity_id' => $entry->id,
+                'details' => [
+                    'partner_id' => $entry->partner_id,
+                    'partner' => $entry->partner?->fullName(),
+                    'total_espees' => $entry->total_espees,
+                ],
+            ]);
+
+            $entry->delete();
+        });
+
+        return back()->with('success', 'Giving record deleted.');
+    }
+
+    /**
+     * Ensures the authenticated user is allowed to modify the given giving
+     * entry, i.e. the entry's church is within the user's visible scope.
+     */
+    private function authorizeEntryAccess($user, PartnershipEntry $entry): void
+    {
+        $churchIds = $user->visibleChurchIds();
+        if ($churchIds !== null && ! in_array($entry->church_id, $churchIds, true)) {
+            abort(403);
+        }
+    }
 }

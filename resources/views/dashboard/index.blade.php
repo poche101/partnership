@@ -64,28 +64,33 @@
 </div>
 
 @if (count($series))
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+@push('scripts')
 <script>
-    const ctx = document.getElementById('trendChart');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: @json(collect($series)->pluck('date')),
-            datasets: [{
-                label: 'ESPEES',
-                data: @json(collect($series)->pluck('total')),
-                borderColor: '#B98D4C',
-                backgroundColor: 'rgba(185,141,76,0.15)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 0,
-            }],
-        },
-        options: {
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } },
-        },
+    document.addEventListener('DOMContentLoaded', () => {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx || typeof window.Chart === 'undefined') return;
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: @json(collect($series)->pluck('date')),
+                datasets: [{
+                    label: 'ESPEES',
+                    data: @json(collect($series)->pluck('total')),
+                    borderColor: '#B98D4C',
+                    backgroundColor: 'rgba(185,141,76,0.15)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                }],
+            },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } },
+            },
+        });
     });
 </script>
+@endpush
 @endif
 @endsection

@@ -19,20 +19,37 @@ class GivingStatementMail extends Mailable
     public function build()
     {
         $partner = $this->statement->partner;
-        $name = $partner->fullName();
-        if ($partner->spouse_name) {
-            $name .= ' & '.$partner->spouse_name;
-        }
+        
+        $partnerLabel = trim(($partner->title ?? '').' '.$partner->first_name.' '.$partner->last_name);
+        $spouseLabel = filled($partner->spouse_first_name)
+            ? trim(($partner->spouse_title ?? '').' '.$partner->spouse_first_name.' '.($partner->spouse_last_name ?: $partner->last_name))
+            : null;
+
+        $name = $partnerLabel . ($spouseLabel ? ' & ' . $spouseLabel : '');
+
+        $messageBody = $this->statement->content 
+            ?? $this->statement->message 
+            ?? $this->statement->message_template 
+            ?? session('statement_preview');
 
         $pdf = Pdf::loadView('statements.pdf', [
             'statement' => $this->statement,
-            'partner' => $partner,
-            'name' => $name,
+            'partner'   => $partner,
+            'name'      => $name,
+            'message'   => $messageBody,
         ])->setPaper('a4');
 
-        return $this->subject('Your Partnership Giving Statement')
+        return $this->subject('Your Partnership Giving Statement - Zone 5')
             ->view('statements.mail')
-            ->with(['name' => $name, 'statement' => $this->statement])
+            ->with([
+                'statement'   => $this->statement,
+                'partner'     => $partner,
+                'name'        => $name,
+                'partnerName' => $partnerLabel,
+                'spouseName'  => $spouseLabel,
+                'messageBody' => $messageBody,
+                'generatedAt' => $this->statement->created_at?->format('M j, Y') ?? now()->format('M j, Y'),
+            ])
             ->attachData($pdf->output(), 'giving-statement.pdf', [
                 'mime' => 'application/pdf',
             ]);

@@ -1,39 +1,75 @@
 @extends('layouts.app')
 @section('title', 'Giving Statements')
 @section('content')
-<div class="mx-auto max-w-5xl px-6 py-8">
-    <h1 class="font-display text-2xl text-primary">Giving Statements</h1>
+<div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+    <h1 class="font-display text-xl sm:text-2xl text-primary">Giving Statements</h1>
     <p class="mt-1 text-sm text-muted-foreground">Generate a partnership giving statement for a partner over an optional date range.</p>
+
+    @php
+        // Fallback template used to seed the "Message Template" field. Tokens
+        // are replaced client-side (see script below) once a partner and/or
+        // dates are chosen, but the user is free to edit or fully replace
+        // this text before generating the statement — it's submitted as
+        // plain text in the "message_template" field.
+        $defaultTemplate = "Dear {partner_name}{spouse_suffix},\n\n"
+            ."Thank you for your faithful partnership during the period {period}. "
+            ."Total recorded: {total} ESPEES.\n\n"
+            ."We deeply appreciate your continued support.\n\n"
+            ."Zone 5 Partnership Team";
+    @endphp
 
     <div class="card mt-6 p-6">
         <form method="POST" action="{{ route('statements.store') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-4">
             @csrf
             <div class="sm:col-span-2">
                 <label class="field-label">Partner</label>
-                <select name="partner_id" required class="field-input">
+                <select name="partner_id" id="statement-partner-select" required class="field-input">
                     <option value="">Select partner…</option>
                     @foreach ($partners as $p)
                         @php
-                            $optionName = collect([
-                                $p->title ?? null,
-                                $p->first_name ?? null,
-                                $p->spouse_title ?? null,
-                                $p->spouse_first_name ?? null,
-                                ($p->spouse_last_name ?? $p->last_name) ?: null,
-                            ])->filter()->implode(', ');
+                            $partnerLabel = trim(($p->title ?? '').' '.$p->first_name.' '.$p->last_name);
+                            $hasSpouse = filled($p->spouse_first_name);
+                            $spouseLabel = $hasSpouse
+                                ? trim(
+                                    ($p->spouse_title ?? '').' '.
+                                    $p->spouse_first_name.' '.
+                                    ($p->spouse_last_name ?: $p->last_name)
+                                )
+                                : null;
                         @endphp
-                        <option value="{{ $p->id }}">{{ $optionName }}</option>
+                        <option value="{{ $p->id }}"
+                            data-partner-name="{{ $partnerLabel }}"
+                            data-spouse-name="{{ $spouseLabel }}">
+                            {{ $partnerLabel }}{{ $spouseLabel ? ' — Spouse: '.$spouseLabel : '' }}
+                        </option>
                     @endforeach
                 </select>
             </div>
             <div>
                 <label class="field-label">From</label>
-                <input type="date" name="period_start" class="field-input">
+                <input type="date" name="period_start" id="statement-period-start" class="field-input">
             </div>
             <div>
                 <label class="field-label">To</label>
-                <input type="date" name="period_end" class="field-input">
+                <input type="date" name="period_end" id="statement-period-end" class="field-input">
             </div>
+
+            <div class="sm:col-span-4">
+                <div class="flex items-center justify-between">
+                    <label class="field-label mb-0" for="message-template">Message Template</label>
+                    <button type="button" data-open-modal="edit-template" class="text-xs text-primary underline">
+                        Edit in full-size editor
+                    </button>
+                </div>
+                <textarea name="message_template" id="message-template" rows="3"
+                    class="field-input mt-1" placeholder="Customize the message included with this statement.">{{ old('message_template', $defaultTemplate) }}</textarea>
+                <p class="mt-1 text-xs text-muted-foreground">
+                    Placeholders: <code>{partner_name}</code>, <code>{spouse_suffix}</code>,
+                    <code>{period}</code>, <code>{total}</code> — filled in automatically as you pick a
+                    partner and dates, but you can edit or remove them freely.
+                </p>
+            </div>
+
             <div class="sm:col-span-4">
                 <button type="submit" class="btn-primary btn-icon">
                     <svg viewBox="0 0 20 20" fill="none" class="btn-svg"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
@@ -41,6 +77,27 @@
                 </button>
             </div>
         </form>
+    </div>
+
+    {{-- Full-size Message Template Editor Modal --}}
+    <div id="edit-template" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/40">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="card w-full max-w-2xl p-4 sm:p-6">
+                <h2 class="font-display text-lg text-primary">Edit Message Template</h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                    This is the same message that will accompany the statement — edits here sync back to the
+                    form automatically.
+                </p>
+                <textarea id="message-template-modal" rows="12" class="field-input mt-3 font-mono text-sm"></textarea>
+                <div class="mt-3 flex flex-wrap justify-between gap-2">
+                    <button type="button" id="reset-template" class="btn-outline">Reset to default</button>
+                    <div class="flex gap-2">
+                        <button type="button" data-close-modal="edit-template" class="btn-outline">Cancel</button>
+                        <button type="button" id="save-template" class="btn-primary">Use This Message</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     @if (session('statement_preview'))
@@ -62,6 +119,21 @@
                     <div class="statement-rule"></div>
 
                     <h2 class="statement-title">Partnership Giving Statement</h2>
+
+                    @if (session('statement_partner_name'))
+                        <div class="statement-recipient">
+                            <div>
+                                <span class="statement-recipient-label">Partner</span>
+                                <span class="statement-recipient-value">{{ session('statement_partner_name') }}</span>
+                            </div>
+                            @if (session('statement_spouse_name'))
+                                <div>
+                                    <span class="statement-recipient-label">Spouse</span>
+                                    <span class="statement-recipient-value">{{ session('statement_spouse_name') }}</span>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
 
                     <div class="statement-body">
                         <pre class="statement-content">{{ session('statement_preview') }}</pre>
@@ -109,24 +181,28 @@
 
     <div class="table-shell card mt-8 overflow-x-auto">
         <table>
-            <thead><tr><th>Partner</th><th>Period</th><th>Total</th><th>Generated</th><th></th></tr></thead>
+            <thead><tr><th>Partner</th><th>Spouse</th><th>Period</th><th>Total</th><th>Generated</th><th></th></tr></thead>
             <tbody>
                 @forelse ($statements as $s)
                     @php
                         $partner = $s->partner;
                         $hasSpouse = $partner && filled($partner->spouse_first_name);
-                        $rowName = $hasSpouse
-                            ? collect([
-                                $partner->title ?? null,
-                                $partner->first_name ?? null,
-                                $partner->spouse_title ?? null,
-                                $partner->spouse_first_name ?? null,
-                                ($partner->spouse_last_name ?? $partner->last_name) ?: null,
-                              ])->filter()->implode(', ')
-                            : $partner?->fullName();
+
+                        $partnerRowName = $partner
+                            ? trim(($partner->title ?? '').' '.$partner->first_name.' '.$partner->last_name)
+                            : '—';
+
+                        $spouseRowName = $hasSpouse
+                            ? trim(
+                                ($partner->spouse_title ?? '').' '.
+                                $partner->spouse_first_name.' '.
+                                ($partner->spouse_last_name ?: $partner->last_name)
+                            )
+                            : null;
                     @endphp
                     <tr>
-                        <td class="font-medium">{{ $rowName }}</td>
+                        <td class="font-medium">{{ $partnerRowName }}</td>
+                        <td>{{ $spouseRowName ?? '—' }}</td>
                         <td>{{ $s->period_start?->format('M j, Y') ?? '—' }} – {{ $s->period_end?->format('M j, Y') ?? '—' }}</td>
                         <td class="font-mono">{{ number_format($s->total_espees, 2) }}</td>
                         <td>{{ $s->created_at->format('M j, Y g:ia') }}</td>
@@ -141,7 +217,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="py-6 text-center text-muted-foreground">No statements generated yet.</td></tr>
+                    <tr><td colspan="6" class="py-6 text-center text-muted-foreground">No statements generated yet.</td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -220,6 +296,26 @@
         color: var(--doc-ink);
         letter-spacing: 0.01em;
     }
+    .statement-recipient {
+        margin-top: 0.9rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+    }
+    .statement-recipient-label {
+        display: block;
+        font-size: 0.65rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--doc-brass);
+        font-weight: 600;
+    }
+    .statement-recipient-value {
+        display: block;
+        font-size: 0.9rem;
+        color: var(--doc-ink);
+        margin-top: 0.15rem;
+    }
     .statement-body { margin-top: 1.25rem; }
     .statement-content {
         white-space: pre-wrap;
@@ -288,6 +384,78 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+    const DEFAULT_TEMPLATE = @json($defaultTemplate);
+
+    const partnerSelect = document.getElementById('statement-partner-select');
+    const startInput = document.getElementById('statement-period-start');
+    const endInput = document.getElementById('statement-period-end');
+    const templateField = document.getElementById('message-template');
+    const templateModalField = document.getElementById('message-template-modal');
+    const saveTemplateBtn = document.getElementById('save-template');
+    const resetTemplateBtn = document.getElementById('reset-template');
+
+    let lastAutoFilled = templateField ? templateField.value : '';
+
+    function formatDate(value) {
+        if (!value) return '…';
+        const d = new Date(value + 'T00:00:00');
+        if (Number.isNaN(d.getTime())) return value;
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function fillTemplate() {
+        if (!templateField) return;
+
+        // Only auto-fill placeholders while the user hasn't customized the
+        // template themselves — once they've edited it, leave it alone.
+        if (templateField.value !== lastAutoFilled) return;
+
+        const opt = partnerSelect?.options[partnerSelect.selectedIndex];
+        const partnerName = opt?.dataset.partnerName || '{partner_name}';
+        const spouseName = opt?.dataset.spouseName || '';
+        const spouseSuffix = spouseName ? ` and ${spouseName}` : '';
+        const period = (startInput?.value || endInput?.value)
+            ? `${formatDate(startInput?.value)} – ${formatDate(endInput?.value)}`
+            : 'the selected period';
+
+        const filled = DEFAULT_TEMPLATE
+            .replace('{partner_name}', partnerName)
+            .replace('{spouse_suffix}', spouseSuffix)
+            .replace('{period}', period)
+            .replace('{total}', '{total}');
+
+        templateField.value = filled;
+        lastAutoFilled = filled;
+    }
+
+    partnerSelect?.addEventListener('change', fillTemplate);
+    startInput?.addEventListener('change', fillTemplate);
+    endInput?.addEventListener('change', fillTemplate);
+
+    // Full-size modal editor: syncs with the inline textarea on open/save.
+    document.querySelectorAll('[data-open-modal="edit-template"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            if (templateModalField && templateField) {
+                templateModalField.value = templateField.value;
+            }
+        });
+    });
+
+    saveTemplateBtn?.addEventListener('click', () => {
+    if (templateField && templateModalField) {
+        templateField.value = templateModalField.value;
+    }
+    document.getElementById('edit-template')?.classList.add('hidden');
+});
+
+    resetTemplateBtn?.addEventListener('click', () => {
+        if (templateModalField) {
+            templateModalField.value = DEFAULT_TEMPLATE;
+        }
+    });
+});
+
 document.getElementById('download-pdf')?.addEventListener('click', async () => {
     const button = document.getElementById('download-pdf');
     const source = document.getElementById('statement-doc');

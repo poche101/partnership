@@ -55,10 +55,15 @@ Route::middleware('auth')->group(function () {
 
     // ALL ADMINS (ZONE, GROUP, CHURCH) ROUTES
     Route::middleware('role:zone_admin,group_admin,church_admin')->group(function () {
+        Route::put('/partners/{partner}', [PartnerController::class, 'update'])->name('partners.update');
+Route::delete('/partners/{partner}', [PartnerController::class, 'destroy'])->name('partners.destroy');
         Route::get('/partners/export', [PartnerController::class, 'export'])->name('partners.export');
         Route::get('/partners', [PartnerController::class, 'index'])->name('partners.index');
         Route::post('/partners', [PartnerController::class, 'store'])->name('partners.store');
+        
 
+        Route::put('/givings/{entry}', [GivingController::class, 'update'])->name('givings.update');
+Route::delete('/givings/{entry}', [GivingController::class, 'destroy'])->name('givings.destroy');
         Route::get('/givings', [GivingController::class, 'index'])->name('givings.index');
         Route::post('/givings', [GivingController::class, 'store'])->name('givings.store');
 

@@ -44,5 +44,8 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->command?->info("Seeded zone super admin: {$email} / {$password}");
+
+        // Groups, churches, pastors, and one login per church.
+        $this->call(ChurchDataSeeder::class);
     }
 }

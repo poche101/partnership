@@ -1,4 +1,13 @@
 // Minimal helpers used across Blade views (no framework needed).
+
+import Chart from 'chart.js/auto';
+
+// Exposed globally so inline <script> blocks in Blade views (e.g. the
+// dashboard's `new Chart(ctx, {...})` trend chart) can keep using the same
+// `Chart` global they'd get from the CDN <script> tag — just bundled and
+// self-hosted through Vite instead of depending on cdnjs staying reachable.
+window.Chart = Chart;
+
 document.addEventListener('click', (e) => {
     const opener = e.target.closest('[data-open-modal]');
     if (opener) {

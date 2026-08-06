@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Church;
 use App\Models\GroupChurch;
 use App\Models\Partner;
@@ -46,6 +47,20 @@ class DashboardController extends Controller
         ])->sortByDesc('total')->take(6)->values();
 
         // 30-day trend (zone admin only, matches the original UI)
+        //
+        // IMPORTANT: this can NOT be built from PartnershipEntry. That table
+        // holds one running-total row PER PARTNER, which gets overwritten
+        // (amounts added, recorded_at reset to now()) on every gift — so
+        // $entry->recorded_at only ever reflects a partner's most recent
+        // gift, never their giving history. A partner who gave on day 1 and
+        // again on day 20 would show 0 on day 1 and their *entire* total on
+        // day 20, and would vanish from the trend completely once day 20
+        // ages out of the 30-day window.
+        //
+        // AuditLog has the real per-gift history: one 'giving.recorded' row
+        // per actual transaction, with a true timestamp and an 'added'
+        // amount per arm (see GivingController@store). That's the correct
+        // source for a day-by-day trend.
         $series = [];
         if ($user->isZoneAdmin()) {
             $byDay = [];
@@ -53,13 +68,29 @@ class DashboardController extends Controller
                 $d = now()->subDays($i)->toDateString();
                 $byDay[$d] = ['total' => 0.0, 'partners' => 0];
             }
-            foreach ($entries as $e) {
-                $day = $e->recorded_at?->toDateString();
-                if ($day && isset($byDay[$day])) {
-                    $byDay[$day]['total'] += (float) $e->total_espees;
-                    $byDay[$day]['partners'] += 1;
-                }
+
+            $logsQuery = AuditLog::where('action', 'giving.recorded')
+                ->where('created_at', '>=', now()->subDays(29)->startOfDay());
+
+            if ($churchIds !== null) {
+                $logsQuery->whereIn('church_id', $churchIds);
             }
+
+            $logs = $logsQuery->get(['church_id', 'created_at', 'details']);
+
+            foreach ($logs as $log) {
+                $day = $log->created_at?->toDateString();
+                if (! $day || ! isset($byDay[$day])) {
+                    continue;
+                }
+
+                $addedThisEvent = collect($log->details['changes'] ?? [])
+                    ->sum(fn ($change) => (float) ($change['added'] ?? 0));
+
+                $byDay[$day]['total'] += $addedThisEvent;
+                $byDay[$day]['partners'] += 1;
+            }
+
             foreach ($byDay as $date => $v) {
                 $series[] = ['date' => substr($date, 5), 'total' => round($v['total'], 2), 'partners' => $v['partners']];
             }
