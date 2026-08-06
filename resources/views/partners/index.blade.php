@@ -338,16 +338,46 @@
         <div class="flex min-h-full items-center justify-center p-4">
             <div class="card w-full max-w-2xl p-4 sm:p-6">
                 <h2 class="font-display text-lg text-primary">New Partner</h2>
-                <form method="POST" action="{{ route('partners.store') }}" class="mt-4 space-y-4">
+                <form id="new-partner-form" method="POST" action="{{ route('partners.store') }}" class="mt-4 space-y-4">
                     @csrf
                     @if ($churches->count() > 1 || !auth()->user()->isChurchAdmin())
                         <div>
                             <label class="field-label">Church</label>
-                            <select name="church_id" required class="field-input">
-                                @foreach ($churches as $c)
-                                    <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                @endforeach
-                            </select>
+
+                            <div class="combobox relative" id="new-partner-church-combobox">
+                                <button
+                                    type="button"
+                                    id="new-partner-church-trigger"
+                                    class="field-input flex w-full items-center justify-between gap-2 text-left"
+                                    aria-haspopup="listbox"
+                                    aria-expanded="false"
+                                >
+                                    <span id="new-partner-church-trigger-label" class="truncate text-muted-foreground">Select church…</span>
+                                    <svg viewBox="0 0 20 20" fill="none" class="combobox-chevron">
+                                        <path d="M5.5 7.5L10 12l4.5-4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+
+                                <div id="new-partner-church-panel" class="combobox-panel hidden">
+                                    <input
+                                        type="text"
+                                        id="new-partner-church-search"
+                                        class="combobox-search"
+                                        placeholder="Search churches…"
+                                        autocomplete="off"
+                                    >
+                                    <ul id="new-partner-church-options" class="combobox-options" role="listbox">
+                                        @foreach ($churches as $c)
+                                            <li role="option" class="combobox-option" data-id="{{ $c->id }}" data-name="{{ $c->name }}">
+                                                {{ $c->name }}
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                    <p id="new-partner-church-no-results" class="combobox-empty hidden">No churches match your search.</p>
+                                </div>
+                            </div>
+
+                            <input type="hidden" name="church_id" id="new-partner-church-select" value="">
                         </div>
                     @endif
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -429,6 +459,89 @@
             </div>
         </div>
     </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const root = document.getElementById('new-partner-church-combobox');
+        const trigger = document.getElementById('new-partner-church-trigger');
+        const triggerLabel = document.getElementById('new-partner-church-trigger-label');
+        const panel = document.getElementById('new-partner-church-panel');
+        const search = document.getElementById('new-partner-church-search');
+        const optionsList = document.getElementById('new-partner-church-options');
+        const noResults = document.getElementById('new-partner-church-no-results');
+        const hiddenInput = document.getElementById('new-partner-church-select');
+        const form = document.getElementById('new-partner-form');
+
+        if (!root || !trigger || !panel || !search || !optionsList || !hiddenInput) return;
+
+        const options = Array.from(optionsList.querySelectorAll('.combobox-option'));
+
+        function openPanel() {
+            panel.classList.remove('hidden');
+            trigger.setAttribute('aria-expanded', 'true');
+            trigger.classList.remove('combobox-trigger-error');
+            search.value = '';
+            options.forEach((o) => { o.hidden = false; });
+            noResults.classList.add('hidden');
+            search.focus();
+        }
+
+        function closePanel() {
+            panel.classList.add('hidden');
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+
+        trigger.addEventListener('click', () => {
+            const isOpen = !panel.classList.contains('hidden');
+            if (isOpen) {
+                closePanel();
+            } else {
+                openPanel();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!root.contains(e.target)) closePanel();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closePanel();
+        });
+
+        search.addEventListener('input', () => {
+            const term = search.value.trim().toLowerCase();
+            let anyVisible = false;
+
+            options.forEach((o) => {
+                const matches = !term || o.dataset.name.toLowerCase().includes(term);
+                o.hidden = !matches;
+                if (matches) anyVisible = true;
+            });
+
+            noResults.classList.toggle('hidden', anyVisible);
+        });
+
+        options.forEach((opt) => {
+            opt.addEventListener('click', () => {
+                hiddenInput.value = opt.dataset.id;
+                triggerLabel.textContent = opt.dataset.name;
+                triggerLabel.classList.remove('text-muted-foreground');
+                closePanel();
+            });
+        });
+
+        // The hidden input can't show the browser's native "please fill
+        // this field" bubble, so validate on submit ourselves and reopen
+        // the panel with a visible error state instead.
+        form?.addEventListener('submit', (e) => {
+            if (!hiddenInput.value) {
+                e.preventDefault();
+                trigger.classList.add('combobox-trigger-error');
+                openPanel();
+            }
+        });
+    });
+    </script>
 
     <style>
         .registry {
@@ -629,6 +742,79 @@
                 width: 30px;
                 height: 30px;
             }
+        }
+
+        /* Church combobox (New Partner modal) — search bar built into the dropdown panel */
+        .combobox-chevron {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            color: var(--muted-foreground, #7A756B);
+            transition: transform 0.12s ease;
+        }
+
+        #new-partner-church-trigger[aria-expanded="true"] .combobox-chevron {
+            transform: rotate(180deg);
+        }
+
+        .combobox-trigger-error {
+            border-color: #B3261E !important;
+        }
+
+        .combobox-panel {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            z-index: 30;
+            background: var(--card, #fff);
+            border: 1px solid var(--border, #E5E1D8);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+
+        .combobox-search {
+            width: 100%;
+            border: none;
+            border-bottom: 1px solid var(--border, #E5E1D8);
+            padding: 0.6rem 0.85rem;
+            font-size: 0.875rem;
+            outline: none;
+            background: var(--card, #fff);
+            color: var(--foreground, #1F1B16);
+        }
+
+        .combobox-search:focus {
+            background: var(--muted, #FAFAF7);
+        }
+
+        .combobox-options {
+            list-style: none;
+            margin: 0;
+            padding: 0.25rem 0;
+            max-height: 14rem;
+            overflow-y: auto;
+        }
+
+        .combobox-option {
+            padding: 0.55rem 0.85rem;
+            font-size: 0.875rem;
+            color: var(--foreground, #1F1B16);
+            cursor: pointer;
+        }
+
+        .combobox-option:hover,
+        .combobox-option.is-active {
+            background: var(--muted, #FAFAF7);
+            color: var(--primary, #3B5A73);
+        }
+
+        .combobox-empty {
+            padding: 0.75rem 0.85rem;
+            font-size: 0.8rem;
+            color: var(--muted-foreground, #B3AEA1);
+            text-align: center;
         }
     </style>
 @endsection

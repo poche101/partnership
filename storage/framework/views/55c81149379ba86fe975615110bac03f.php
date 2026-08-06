@@ -12,11 +12,45 @@
         <?php if($churches->count()): ?>
             <div class="mb-4">
                 <label class="field-label">Church</label>
-                <select id="church-select" class="field-input max-w-sm">
-                    <?php $__currentLoopData = $churches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $c): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($c->id); ?>"><?php echo e($c->name); ?></option>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                </select>
+
+                <div class="combobox relative max-w-sm" id="church-combobox">
+                    <button
+                        type="button"
+                        id="church-trigger"
+                        class="field-input flex w-full items-center justify-between gap-2 text-left"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                    >
+                        <span id="church-trigger-label" class="truncate">
+                            <?php echo e($churches->first()->name ?? 'Select church…'); ?>
+
+                        </span>
+                        <svg viewBox="0 0 20 20" fill="none" class="combobox-chevron">
+                            <path d="M5.5 7.5L10 12l4.5-4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+
+                    <div id="church-panel" class="combobox-panel hidden">
+                        <input
+                            type="text"
+                            id="church-search"
+                            class="combobox-search"
+                            placeholder="Search churches…"
+                            autocomplete="off"
+                        >
+                        <ul id="church-options" class="combobox-options" role="listbox">
+                            <?php $__currentLoopData = $churches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $c): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <li role="option" class="combobox-option" data-id="<?php echo e($c->id); ?>" data-name="<?php echo e($c->name); ?>">
+                                    <?php echo e($c->name); ?>
+
+                                </li>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </ul>
+                        <p id="church-no-results" class="combobox-empty hidden">No churches match your search.</p>
+                    </div>
+                </div>
+
+                <input type="hidden" id="church-select" value="<?php echo e($churches->first()->id ?? ''); ?>">
                 <p class="mt-1 text-xs text-muted-foreground">Used for rows that don't specify their own Church Name column.</p>
             </div>
         <?php endif; ?>
@@ -31,28 +65,188 @@
 
         <div id="preview-wrap" class="mt-6 hidden">
             <h2 class="font-display text-lg text-primary">Preview (<span id="preview-count"></span> rows)</h2>
-            <div class="table-shell card mt-2 max-h-80 overflow-auto">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Church</th>
-                            <th>Category</th>
-                            <th>KingsChat</th>
-                            <th>Phone</th>
-                            <th>Email</th>
-                            <th>Giving Total</th>
-                        </tr>
-                    </thead>
-                    <tbody id="preview-body"></tbody>
-                </table>
+
+            <div class="registry mt-2">
+                <div class="registry-scroll" style="max-height: 20rem; overflow-y: auto;">
+                    <table class="registry-table">
+                        <thead>
+                            <tr class="registry-group-row">
+                                <th colspan="5" class="registry-group-header registry-group-partner">Partner Details</th>
+                                <th colspan="5" class="registry-group-header registry-group-spouse">Spouse Details</th>
+                                <th rowspan="2" class="registry-group-header registry-group-giving">Church</th>
+                                <th rowspan="2" class="registry-group-header registry-group-giving">Giving Total</th>
+                            </tr>
+                            <tr>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>KingsChat</th>
+                                <th class="registry-divider">Name</th>
+                                <th>Category</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>KingsChat</th>
+                            </tr>
+                        </thead>
+                        <tbody id="preview-body"></tbody>
+                    </table>
+                </div>
             </div>
+
             <button id="confirm-import" class="btn-primary mt-4">Confirm &amp; Import</button>
         </div>
 
         <div id="result" class="mt-4 hidden rounded-md border border-accent/40 bg-accent/10 px-4 py-3 text-sm"></div>
     </div>
 </div>
+
+<style>
+    /* Church combobox */
+    .combobox { }
+    .combobox-chevron {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        color: var(--muted-foreground, #7A756B);
+        transition: transform 0.12s ease;
+    }
+    #church-trigger[aria-expanded="true"] .combobox-chevron {
+        transform: rotate(180deg);
+    }
+    .combobox-panel {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        z-index: 30;
+        background: var(--card, #fff);
+        border: 1px solid var(--border, #E5E1D8);
+        border-radius: 8px;
+        box-shadow: 0 8px 24px -8px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.06);
+        overflow: hidden;
+    }
+    .combobox-search {
+        width: 100%;
+        border: none;
+        border-bottom: 1px solid var(--border, #E5E1D8);
+        padding: 0.6rem 0.85rem;
+        font-size: 0.875rem;
+        outline: none;
+        background: var(--card, #fff);
+        color: var(--foreground, #1F1B16);
+    }
+    .combobox-search:focus {
+        background: var(--muted, #FAFAF7);
+    }
+    .combobox-options {
+        list-style: none;
+        margin: 0;
+        padding: 0.25rem 0;
+        max-height: 14rem;
+        overflow-y: auto;
+    }
+    .combobox-option {
+        padding: 0.55rem 0.85rem;
+        font-size: 0.875rem;
+        color: var(--foreground, #1F1B16);
+        cursor: pointer;
+    }
+    .combobox-option:hover,
+    .combobox-option.is-active {
+        background: var(--muted, #FAFAF7);
+        color: var(--primary, #3B5A73);
+    }
+    .combobox-empty {
+        padding: 0.75rem 0.85rem;
+        font-size: 0.8rem;
+        color: var(--muted-foreground, #B3AEA1);
+        text-align: center;
+    }
+
+    .registry {
+        border: 1px solid var(--border, #E5E1D8);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--card, #fff);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+
+    .registry-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+    .registry-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+    .registry-scroll::-webkit-scrollbar-thumb {
+        background: var(--border, #E5E1D8);
+        border-radius: 999px;
+    }
+
+    .registry-table {
+        width: 100%;
+        min-width: 1200px;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+    .registry-table thead th {
+        text-align: left;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted-foreground, #7A756B);
+        padding: 0.7rem 1.1rem;
+        border-bottom: 2px solid var(--border, #E5E1D8);
+        background: var(--muted, #FAFAF7);
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .registry-group-header {
+        text-align: center;
+        font-size: 0.72rem;
+        padding: 0.6rem 1.1rem;
+        border-bottom: 1px solid var(--border, #E5E1D8);
+    }
+    .registry-group-partner {
+        background: var(--muted, #F3F2ED);
+        color: var(--primary, #3B5A73);
+    }
+    .registry-group-spouse {
+        background: #EFE9E0;
+        color: #7A5C3E;
+    }
+    .registry-group-giving {
+        background: var(--muted, #F3F2ED);
+        color: var(--primary, #3B5A73);
+    }
+
+    .registry-table tbody tr {
+        border-bottom: 1px solid var(--border, #EEEBE3);
+        transition: background-color 0.12s ease;
+    }
+    .registry-table tbody tr:last-child { border-bottom: none; }
+    .registry-table tbody tr:hover { background: var(--muted, #FAFAF7); }
+    .registry-table td {
+        padding: 0.85rem 1.1rem;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .registry-divider {
+        border-left: 2px solid var(--border, #E5E1D8);
+    }
+
+    .registry-name {
+        font-weight: 500;
+        color: var(--foreground, #1F1B16);
+        line-height: 1.3;
+    }
+    .registry-muted { color: var(--muted-foreground, #B3AEA1); }
+</style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
@@ -75,6 +269,78 @@ function escapeHtml(str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 }
+
+// Church combobox: a button showing the current selection opens a panel
+// containing the search box and the option list together. Typing filters
+// the list in place; clicking an option sets the hidden #church-select
+// input (still what confirm-import and renderPreview read from) and
+// updates the trigger label, then closes the panel.
+document.addEventListener('DOMContentLoaded', () => {
+    const root = document.getElementById('church-combobox');
+    const trigger = document.getElementById('church-trigger');
+    const triggerLabel = document.getElementById('church-trigger-label');
+    const panel = document.getElementById('church-panel');
+    const search = document.getElementById('church-search');
+    const optionsList = document.getElementById('church-options');
+    const noResults = document.getElementById('church-no-results');
+    const hiddenInput = document.getElementById('church-select');
+
+    if (!root || !trigger || !panel || !search || !optionsList || !hiddenInput) return;
+
+    const options = Array.from(optionsList.querySelectorAll('.combobox-option'));
+
+    function openPanel() {
+        panel.classList.remove('hidden');
+        trigger.setAttribute('aria-expanded', 'true');
+        search.value = '';
+        options.forEach((o) => { o.hidden = false; });
+        noResults.classList.add('hidden');
+        search.focus();
+    }
+
+    function closePanel() {
+        panel.classList.add('hidden');
+        trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    trigger.addEventListener('click', () => {
+        const isOpen = !panel.classList.contains('hidden');
+        if (isOpen) {
+            closePanel();
+        } else {
+            openPanel();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!root.contains(e.target)) closePanel();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closePanel();
+    });
+
+    search.addEventListener('input', () => {
+        const term = search.value.trim().toLowerCase();
+        let anyVisible = false;
+
+        options.forEach((o) => {
+            const matches = !term || o.dataset.name.toLowerCase().includes(term);
+            o.hidden = !matches;
+            if (matches) anyVisible = true;
+        });
+
+        noResults.classList.toggle('hidden', anyVisible);
+    });
+
+    options.forEach((opt) => {
+        opt.addEventListener('click', () => {
+            hiddenInput.value = opt.dataset.id;
+            triggerLabel.textContent = opt.dataset.name;
+            closePanel();
+        });
+    });
+});
 
 document.getElementById('file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -105,8 +371,8 @@ document.getElementById('file-input').addEventListener('change', (e) => {
 });
 
 function renderPreview() {
-    const churchSelect = document.getElementById('church-select');
-    const fallbackChurchName = churchSelect ? churchSelect.options[churchSelect.selectedIndex]?.textContent : '';
+    const churchTriggerLabel = document.getElementById('church-trigger-label');
+    const fallbackChurchName = churchTriggerLabel ? churchTriggerLabel.textContent.trim() : '';
 
     document.getElementById('preview-wrap').classList.remove('hidden');
     document.getElementById('preview-count').textContent = parsedRows.length;
@@ -115,21 +381,28 @@ function renderPreview() {
     body.innerHTML = parsedRows.slice(0, 50).map((r) => {
         const total = ARM_KEYS.reduce((s, k) => s + (r.giving[k] || 0), 0);
 
-        const name = [r.partner.title, r.partner.first_name, r.partner.last_name].filter(Boolean).join(' ');
-        const spouseCompact = [r.partner.spouse_first_name, r.partner.spouse_last_name].filter(Boolean).join(' ');
-        const nameCell = spouseCompact
-            ? `${escapeHtml(name)} <span class="text-muted-foreground">&amp; ${escapeHtml(spouseCompact)}</span>`
-            : escapeHtml(name);
+        const partnerName = [r.partner.title, r.partner.first_name, r.partner.last_name].filter(Boolean).join(' ');
+        const hasSpouse = !!r.partner.spouse_first_name;
+        const spouseName = hasSpouse
+            ? [r.partner.spouse_title, r.partner.spouse_first_name, r.partner.spouse_last_name].filter(Boolean).join(' ')
+            : '';
 
         const church = r.partner.church_name || fallbackChurchName || '—';
 
+        const muted = (v) => v ? escapeHtml(v) : '<span class="registry-muted">—</span>';
+
         return `<tr>
-            <td class="font-medium">${nameCell}</td>
+            <td><div class="registry-name">${escapeHtml(partnerName)}</div></td>
+            <td>${muted(r.partner.delegate_category)}</td>
+            <td>${muted(r.partner.phone)}</td>
+            <td>${muted(r.partner.email)}</td>
+            <td>${muted(r.partner.kingschat_username)}</td>
+            <td class="registry-divider">${hasSpouse ? `<div class="registry-name">${escapeHtml(spouseName)}</div>` : '<span class="registry-muted">—</span>'}</td>
+            <td>${hasSpouse ? muted(r.partner.spouse_delegate_category) : '<span class="registry-muted">—</span>'}</td>
+            <td>${hasSpouse ? muted(r.partner.spouse_phone) : '<span class="registry-muted">—</span>'}</td>
+            <td>${hasSpouse ? muted(r.partner.spouse_email) : '<span class="registry-muted">—</span>'}</td>
+            <td>${hasSpouse ? muted(r.partner.spouse_kingschat) : '<span class="registry-muted">—</span>'}</td>
             <td>${escapeHtml(church)}</td>
-            <td>${escapeHtml(r.partner.delegate_category || '—')}</td>
-            <td>${escapeHtml(r.partner.kingschat_username || '—')}</td>
-            <td>${escapeHtml(r.partner.phone || '—')}</td>
-            <td>${escapeHtml(r.partner.email || '—')}</td>
             <td class="font-mono">${total.toFixed(2)}</td>
         </tr>`;
     }).join('');
