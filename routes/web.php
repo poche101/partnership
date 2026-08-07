@@ -68,6 +68,7 @@ Route::delete('/givings/{entry}', [GivingController::class, 'destroy'])->name('g
         Route::post('/givings', [GivingController::class, 'store'])->name('givings.store');
 
         Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
+        Route::get('/audit/export', [AuditController::class, 'export'])->name('audit.export');
 
         Route::get('/upload', [UploadController::class, 'index'])->name('upload.index');
         Route::post('/upload', [UploadController::class, 'import'])->name('upload.import');

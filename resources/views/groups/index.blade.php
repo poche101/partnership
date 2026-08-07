@@ -5,10 +5,16 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="font-display text-2xl text-primary">Group Churches</h1>
-            <p class="mt-1 text-sm text-muted-foreground">Create group churches and their group admins.</p>
+            <p class="mt-1 text-sm text-muted-foreground">All groups and the churches under each one.</p>
         </div>
         <button data-open-modal="new-group" class="btn-primary">+ New Group Church</button>
     </div>
+
+    @if (session('success'))
+        <div class="mt-4 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-primary">
+            {{ session('success') }}
+        </div>
+    @endif
 
     <div class="table-shell card mt-6 overflow-x-auto">
         <table>

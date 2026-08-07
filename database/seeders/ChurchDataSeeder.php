@@ -268,10 +268,37 @@ class ChurchDataSeeder extends Seeder
     public function run(): void
     {
         $credentials = [];
-        $defaultPassword = env('SEED_CHURCH_ADMIN_PASSWORD'); // null = generate a random one per church
+        $defaultPassword = env('SEED_CHURCH_ADMIN_PASSWORD'); // null = generate a random one per church/group
 
         foreach (self::GROUPS as $groupName => $churches) {
             $group = GroupChurch::updateOrCreate(['name' => $groupName], ['name' => $groupName]);
+
+            // One group_admin login per group, scoped via group_church_id.
+            // '-group' keeps this email distinct from any church whose slug
+            // happens to match the group name (e.g. "Lekki Group" vs a
+            // "Lekki" church) so neither updateOrCreate call clobbers the
+            // other's user record.
+            $groupEmail = Str::slug($groupName).'-group@zone5.app';
+            $groupPassword = $defaultPassword ?: Str::random(12);
+
+            User::updateOrCreate(
+                ['email' => $groupEmail],
+                [
+                    'name' => $groupName.' Admin',
+                    'password' => Hash::make($groupPassword),
+                    'role' => 'group_admin',
+                    'group_church_id' => $group->id,
+                ]
+            );
+
+            $credentials[] = [
+                'type' => 'group_admin',
+                'group' => $groupName,
+                'church' => null,
+                'pastor' => null,
+                'email' => $groupEmail,
+                'password' => $groupPassword,
+            ];
 
             foreach ($churches as $churchData) {
                 $church = Church::updateOrCreate(
@@ -288,11 +315,13 @@ class ChurchDataSeeder extends Seeder
                         'name' => $churchData['pastor'] ?? $churchData['name'],
                         'password' => Hash::make($password),
                         'role' => 'church_admin',
+                        'group_church_id' => $group->id,
                         'church_id' => $church->id,
                     ]
                 );
 
                 $credentials[] = [
+                    'type' => 'church_admin',
                     'group' => $groupName,
                     'church' => $churchData['name'],
                     'pastor' => $churchData['pastor'],
@@ -302,21 +331,24 @@ class ChurchDataSeeder extends Seeder
             }
         }
 
-        // Write every generated login to a CSV for handoff — printing 240+
+        // Write every generated login to a CSV for handoff — printing 260+
         // lines to the console isn't practical, and re-running the seeder
         // won't reveal old plaintext passwords again (only the hashes are
         // stored), so this file is the only place the passwords exist
-        // outside of what you hand out to each pastor.
-        $csv = "group,church,pastor,email,password\n";
+        // outside of what you hand out to each pastor/group admin.
+        $csv = "type,group,church,pastor,email,password\n";
         foreach ($credentials as $row) {
             $csv .= implode(',', array_map(
                 fn ($v) => '"'.str_replace('"', '""', $v ?? '').'"',
-                [$row['group'], $row['church'], $row['pastor'], $row['email'], $row['password']]
+                [$row['type'], $row['group'], $row['church'], $row['pastor'], $row['email'], $row['password']]
             ))."\n";
         }
         Storage::disk('local')->put('church-logins.csv', $csv);
 
-        $this->command?->info(count($credentials).' churches seeded across '.count(self::GROUPS).' groups.');
+        $groupCount = count(self::GROUPS);
+        $churchCount = count($credentials) - $groupCount;
+
+        $this->command?->info("{$churchCount} churches seeded across {$groupCount} groups, with a group_admin login created for every group.");
         $this->command?->info('Login credentials written to storage/app/church-logins.csv — treat this file as sensitive and delete it once distributed.');
     }
 }

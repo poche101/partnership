@@ -76,18 +76,26 @@ class StatementController extends Controller
     {
         $partner = $statement->partner;
 
-        if (empty($partner->email)) {
-            return back()->with('error', 'This partner has no email address on file.');
+        // Send to whichever of partner/spouse have an email on file —
+        // a couple sharing one giving record should both receive the
+        // statement when both addresses are available.
+        $recipients = array_values(array_filter([
+            $partner->email ?? null,
+            $partner->spouse_email ?? null,
+        ]));
+
+        if (empty($recipients)) {
+            return back()->with('error', 'This partner has no email address on file for either the partner or spouse.');
         }
 
-        Mail::to($partner->email)->send(new GivingStatementMail($statement));
+        Mail::to($recipients)->send(new GivingStatementMail($statement));
 
         AuditLogger::log(Auth::user(), 'statement.emailed', 'giving_statement', $statement->id, [
             'partner_id' => $partner->id,
-            'email' => $partner->email,
+            'emails' => $recipients,
         ]);
 
-        return back()->with('success', 'Statement sent to '.$partner->email.'.');
+        return back()->with('success', 'Statement sent to '.implode(' and ', $recipients).'.');
     }
 
     /**

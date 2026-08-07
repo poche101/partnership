@@ -45,6 +45,11 @@
 
         <button type="submit" class="btn-primary">Search</button>
 
+        <a href="{{ route('audit.export', request()->query()) }}" class="btn-outline"
+            title="Exports giving records only (recorded &amp; updated gifts) — not admin/church/group activity.">
+            Export Giving Records
+        </a>
+
         @if(request()->filled('q') || request()->filled('date_from') || request()->filled('date_to'))
             <a href="{{ route('audit.index', request()->only(['entity_type', 'entity_id'])) }}"
                 class="btn-outline">Clear</a>

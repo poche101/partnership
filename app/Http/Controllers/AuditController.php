@@ -2,15 +2,42 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\AuditLogsExport;
 use App\Models\AuditLog;
 use App\Support\Arms;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AuditController extends Controller
 {
     public function index(Request $request)
+    {
+        return view('audit.index', [
+            'logs' => $this->filteredQuery($request)->paginate(25)->withQueryString(),
+        ]);
+    }
+
+    /**
+     * Exports the exact same rows index() would show for these filters —
+     * built from the same filteredQuery(), so the two can't drift apart.
+     */
+    public function export(Request $request)
+    {
+        return Excel::download(
+            new AuditLogsExport($this->filteredQuery($request)),
+            'audit-logs-'.now()->format('Y-m-d').'.xlsx'
+        );
+    }
+
+    /**
+     * Shared by index() and export(). Same visibility scope, entity
+     * filter, and search logic as before — date_from/date_to are new:
+     * the view already collects them but nothing applied them yet.
+     */
+    private function filteredQuery(Request $request): Builder
     {
         $user = Auth::user();
         $churchIds = $user->visibleChurchIds();
@@ -54,8 +81,13 @@ class AuditController extends Controller
             });
         }
 
-        return view('audit.index', [
-            'logs' => $query->paginate(25)->withQueryString(),
-        ]);
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->query('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->query('date_to'));
+        }
+
+        return $query;
     }
 }
