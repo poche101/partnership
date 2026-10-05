@@ -53,6 +53,16 @@
             </div>
         @endif
 
+        <div class="mb-3 flex flex-wrap items-center gap-3">
+            <button type="button" id="download-template" class="btn-template">
+                <svg viewBox="0 0 20 20" fill="none" width="16" height="16" aria-hidden="true">
+                    <path d="M10 3v9m0 0l-3.5-3.5M10 12l3.5-3.5M4 15.5h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Download Template (.xlsx)
+            </button>
+            <span class="text-xs text-muted-foreground">Fill it in, then upload it below.</span>
+        </div>
+
         <input type="file" id="file-input" accept=".xlsx,.xls,.csv" class="block w-full text-sm">
         <p class="mt-2 text-xs text-muted-foreground">
             Expected columns (case-insensitive): title, first_name, last_name, delegate_category, kingschat_username,
@@ -100,6 +110,26 @@
 </div>
 
 <style>
+    /* Template download button */
+    .btn-template {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.5rem 0.9rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--primary, #3B5A73);
+        background: var(--card, #fff);
+        border: 1px solid var(--border, #E5E1D8);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.12s ease, border-color 0.12s ease;
+    }
+    .btn-template:hover {
+        background: var(--muted, #FAFAF7);
+        border-color: var(--primary, #3B5A73);
+    }
+
     /* Church combobox */
     .combobox { }
     .combobox-chevron {
@@ -256,6 +286,34 @@ const PARTNER_FIELDS = [
 ];
 
 let parsedRows = [];
+
+// Template download: built in the browser from PARTNER_FIELDS + ARM_KEYS,
+// so the columns always match what the importer expects.
+// Sheet 1 ("Template") is headers only and is the sheet the importer reads.
+// Sheet 2 ("Example") shows a filled-in row for reference and is ignored on import.
+document.getElementById('download-template').addEventListener('click', () => {
+    const headers = [...PARTNER_FIELDS, ...ARM_KEYS];
+
+    const template = XLSX.utils.aoa_to_sheet([headers]);
+    template['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
+
+    const sample = {
+        title: 'Pastor', first_name: 'John', last_name: 'Doe',
+        delegate_category: 'Partner', kingschat_username: 'johndoe',
+        phone: '08012345678', email: 'john@example.com',
+        church_name: 'Example Church', church_category: '', group_name: '',
+        spouse_title: 'Sis', spouse_first_name: 'Jane', spouse_last_name: 'Doe',
+    };
+    ARM_KEYS.forEach((k, i) => { sample[k] = i === 0 ? 5000 : ''; });
+
+    const example = XLSX.utils.aoa_to_sheet([headers, headers.map((h) => sample[h] ?? '')]);
+    example['!cols'] = template['!cols'];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, template, 'Template');
+    XLSX.utils.book_append_sheet(wb, example, 'Example');
+    XLSX.writeFile(wb, 'partnership-upload-template.xlsx');
+});
 
 function normalizeKey(k) {
     return String(k).trim().toLowerCase().replace(/\s+/g, '_');
