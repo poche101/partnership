@@ -51,6 +51,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:zone_admin,group_admin')->group(function () {
         Route::get('/churches', [ChurchController::class, 'index'])->name('churches.index');
         Route::post('/churches', [ChurchController::class, 'store'])->name('churches.store');
+        Route::put('churches/{church}', [ChurchController::class, 'update'])->name('churches.update');
+Route::delete('churches/{church}', [ChurchController::class, 'destroy'])->name('churches.destroy');
     });
 
     // ALL ADMINS (ZONE, GROUP, CHURCH) ROUTES
