@@ -35,7 +35,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/groups', [GroupChurchController::class, 'index'])->name('groups.index');
         Route::post('/groups', [GroupChurchController::class, 'store'])->name('groups.store');
-
+        Route::put('/groups/{group}', [GroupChurchController::class, 'update'])->name('groups.update');
+    Route::delete('/groups/{group}', [GroupChurchController::class, 'destroy'])->name('groups.destroy');
+    
         Route::get('/statements', [StatementController::class, 'index'])->name('statements.index');
         Route::post('/statements', [StatementController::class, 'store'])->name('statements.store');
         Route::post('/statements/{statement}/send', [StatementController::class, 'send'])->name('statements.send');
