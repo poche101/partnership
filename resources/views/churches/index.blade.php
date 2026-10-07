@@ -8,6 +8,15 @@
     $canManage = ! $user->isChurchAdmin();
     $colCount = ($isZone ? 8 : 7);
 @endphp
+
+<style>
+    .pw-wrap { position: relative; }
+    .pw-wrap .field-input { padding-right: 40px; }
+    .pw-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; padding: 4px; background: none; border: 0; cursor: pointer; color: #6b7280; }
+    .pw-toggle:hover { color: #1a2340; }
+    .pw-toggle:focus-visible { outline: 2px solid #1a2340; outline-offset: 2px; border-radius: 4px; }
+</style>
+
 <div class="mx-auto max-w-6xl px-6 py-8">
     <div class="flex items-center justify-between">
         <div>
@@ -165,7 +174,13 @@
                     </div>
                     <div>
                         <label class="field-label">Password</label>
-                        <input type="password" name="admin_password" required minlength="8" class="field-input">
+                        <div class="pw-wrap">
+                            <input type="password" name="admin_password" required minlength="8" autocomplete="new-password" class="field-input">
+                            <button type="button" class="pw-toggle" data-toggle-password aria-label="Show password" title="Show password">
+                                <svg class="pw-eye" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                                <svg class="pw-eye-off" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -274,6 +289,30 @@
         if (el) el.value = value ?? '';
     };
 
+    // Password show/hide
+    const pwToggles = document.querySelectorAll('[data-toggle-password]');
+    const setPasswordVisible = (btn, visible) => {
+        const input = btn.closest('.pw-wrap').querySelector('input');
+        input.type = visible ? 'text' : 'password';
+        btn.querySelector('.pw-eye').style.display = visible ? 'none' : '';
+        btn.querySelector('.pw-eye-off').style.display = visible ? '' : 'none';
+        const label = visible ? 'Hide password' : 'Show password';
+        btn.setAttribute('aria-label', label);
+        btn.setAttribute('title', label);
+    };
+    const resetPasswords = () => pwToggles.forEach((btn) => setPasswordVisible(btn, false));
+
+    pwToggles.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const input = btn.closest('.pw-wrap').querySelector('input');
+            setPasswordVisible(btn, input.type === 'password');
+        });
+    });
+    // Hide the password again whenever the new-church modal is closed
+    document.querySelectorAll('[data-close-modal="new-church"]').forEach((btn) => {
+        btn.addEventListener('click', resetPasswords);
+    });
+
     // Edit
     document.querySelectorAll('[data-edit-church]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -309,7 +348,10 @@
         });
     });
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') ['edit-church', 'delete-church'].forEach(hide);
+        if (e.key === 'Escape') {
+            ['edit-church', 'delete-church'].forEach(hide);
+            resetPasswords();
+        }
     });
 })();
 </script>
