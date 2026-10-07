@@ -24,7 +24,19 @@
         @endforeach
     </div>
 
-    <div class="registry mt-6">
+    {{-- Search (live, filters the rows below) --}}
+    <div class="giv-search-row" role="search">
+        <div class="giv-search-wrap">
+            <svg class="giv-search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z"/></svg>
+            <input type="search" id="giving-search" placeholder="Search by partner, spouse, church, phone, email…" autocomplete="off">
+            <button type="button" id="giving-search-clear" class="giv-search-clear is-hidden" aria-label="Clear search" title="Clear search">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+        </div>
+        <span id="giving-count" class="giv-count" aria-live="polite"></span>
+    </div>
+
+    <div class="registry mt-4">
         <div class="registry-scroll">
             <table class="registry-table">
                 <thead>
@@ -72,8 +84,25 @@
                                 : '?';
                             $palette = ['#3B5A73', '#7A5C3E', '#4E6E58', '#6B5B95', '#8A5A44', '#3E6B6B'];
                             $swatch = $palette[crc32(($partner->id ?? 0).($partner->first_name ?? '')) % count($palette)];
+
+                            // Text the live search matches against (lowercased).
+                            $searchText = mb_strtolower(implode(' ', array_filter([
+                                $partnerName,
+                                $spouseName,
+                                $entry->church?->name,
+                                $partner?->delegate_category,
+                                $partner?->phone,
+                                $partner?->email,
+                                $partner?->kingschat_username,
+                                $hasSpouse ? ($partner->spouse_delegate_category ?? null) : null,
+                                $hasSpouse ? $partner->spouse_phone : null,
+                                $hasSpouse ? $partner->spouse_email : null,
+                                $hasSpouse ? $partner->spouse_kingschat : null,
+                                $entry->recorded_at?->format('M j, Y'),
+                                number_format($row['amount'], 2),
+                            ])));
                         @endphp
-                        <tr>
+                        <tr class="giving-row" data-search="{{ $searchText }}">
                             {{-- Partner Name --}}
                             <td>
                                 <div class="registry-partner">
@@ -165,9 +194,19 @@
                     @empty
                         <tr><td colspan="13" class="registry-empty">No givings recorded for this filter.</td></tr>
                     @endforelse
+
+                    {{-- Shown by the search script when nothing matches --}}
+                    <tr id="giving-no-match" class="is-hidden">
+                        <td colspan="13" class="registry-empty">No givings match your search.</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
+    </div>
+
+    {{-- Load more --}}
+    <div id="giving-more-wrap" class="giv-more-wrap is-hidden">
+        <button type="button" id="giving-more" class="btn-outline giv-more-btn">Load more</button>
     </div>
 </div>
 
@@ -440,6 +479,98 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+{{-- Givings list: live search + "Load more" (15 at a time) --}}
+<script>
+(function () {
+    const PAGE_SIZE = 15;
+
+    const rows = Array.from(document.querySelectorAll('.giving-row'));
+    const input = document.getElementById('giving-search');
+    const clearBtn = document.getElementById('giving-search-clear');
+    const countEl = document.getElementById('giving-count');
+    const moreWrap = document.getElementById('giving-more-wrap');
+    const moreBtn = document.getElementById('giving-more');
+    const noMatch = document.getElementById('giving-no-match');
+
+    if (!input || !moreBtn) return;
+
+    let limit = PAGE_SIZE;
+
+    const getTerms = () => input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+    function render() {
+        const terms = getTerms();
+        let matched = 0;
+        let shown = 0;
+
+        rows.forEach((row) => {
+            const hay = row.dataset.search || '';
+            const isMatch = terms.every((t) => hay.includes(t));
+            if (isMatch) {
+                matched++;
+                if (matched <= limit) {
+                    row.classList.remove('is-hidden');
+                    shown++;
+                } else {
+                    row.classList.add('is-hidden');
+                }
+            } else {
+                row.classList.add('is-hidden');
+            }
+        });
+
+        const remaining = matched - shown;
+
+        // Empty states and counters
+        noMatch.classList.toggle('is-hidden', !(rows.length > 0 && matched === 0));
+        clearBtn.classList.toggle('is-hidden', input.value === '');
+
+        if (rows.length === 0) {
+            countEl.textContent = '';
+        } else if (terms.length) {
+            countEl.textContent = `${matched} ${matched === 1 ? 'result' : 'results'}`;
+        } else {
+            countEl.textContent = `Showing ${shown} of ${matched}`;
+        }
+
+        // Load more button
+        moreWrap.classList.toggle('is-hidden', remaining <= 0);
+        if (remaining > 0) {
+            const next = Math.min(PAGE_SIZE, remaining);
+            moreBtn.textContent = `Load ${next} more (${remaining} remaining)`;
+        }
+    }
+
+    input.addEventListener('input', () => {
+        limit = PAGE_SIZE; // every new search starts again at the first 15
+        render();
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') e.preventDefault();
+        if (e.key === 'Escape' && input.value !== '') {
+            input.value = '';
+            limit = PAGE_SIZE;
+            render();
+        }
+    });
+
+    clearBtn.addEventListener('click', () => {
+        input.value = '';
+        limit = PAGE_SIZE;
+        render();
+        input.focus();
+    });
+
+    moreBtn.addEventListener('click', () => {
+        limit += PAGE_SIZE;
+        render();
+    });
+
+    render();
+})();
+</script>
+
 <style>
     .registry {
         border: 1px solid var(--border, #E5E1D8);
@@ -638,6 +769,81 @@ document.addEventListener('DOMContentLoaded', () => {
         font-weight: 600;
         letter-spacing: 0.04em;
         color: var(--muted-foreground, #7A756B);
+    }
+
+    /* Givings search + load more */
+    .is-hidden { display: none !important; }
+
+    .giv-search-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-top: 20px;
+    }
+    .giv-search-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 220px;
+        max-width: 36rem;
+    }
+    .giv-search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 16px;
+        height: 16px;
+        color: #6b7280;
+        pointer-events: none;
+    }
+    .giv-search-wrap input {
+        width: 100%;
+        height: 44px;
+        padding: 0 40px 0 38px;
+        border: 1px solid #e3ddd0;
+        border-radius: 8px;
+        background: #fff;
+        font-size: 14px;
+        box-shadow: 0 1px 2px rgba(0,0,0,.05);
+        outline: none;
+        box-sizing: border-box;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+    .giv-search-wrap input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+    .giv-search-wrap input:focus {
+        border-color: #1a2340;
+        box-shadow: 0 0 0 3px rgba(26,35,64,.15);
+    }
+    .giv-search-clear {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        color: #6b7280;
+    }
+    .giv-search-clear:hover { color: #1a2340; }
+    .giv-count {
+        font-size: 0.8rem;
+        color: var(--muted-foreground, #7A756B);
+    }
+    .giv-more-wrap {
+        display: flex;
+        justify-content: center;
+        margin-top: 16px;
+    }
+    .giv-more-btn {
+        padding: 10px 22px;
+        font-size: 14px;
+        font-weight: 500;
     }
 
     /* Partner combobox (search bar built into the dropdown panel) */
