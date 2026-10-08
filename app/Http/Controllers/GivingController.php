@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\DrillsDown;
 use App\Models\AuditLog;
 use App\Models\Church;
 use App\Models\Partner;
@@ -13,16 +14,29 @@ use Illuminate\Support\Facades\DB;
 
 class GivingController extends Controller
 {
-    public function index(Request $request)
-    {
-        $user = Auth::user();
-        $churchIds = $user->visibleChurchIds();
+    use DrillsDown;
 
-        $query = PartnershipEntry::with(['partner', 'church.groupChurch'])->latest('recorded_at')->limit(500);
-        if ($churchIds !== null) {
-            $query->whereIn('church_id', $churchIds);
-        }
-        $entries = $query->get();
+    /** Page 1: one line per group church (with its total giving) */
+    public function index()
+    {
+        return $this->groupPage('givings');
+    }
+
+    /** Page 2: churches under a group */
+    public function group(string $group)
+    {
+        return $this->churchPage('givings', $group);
+    }
+
+    /** Page 3: one church's partners and their givings */
+    public function church(Request $request, Church $church)
+    {
+        $this->authorizeChurch($church);
+
+        $entries = PartnershipEntry::with(['partner', 'church.groupChurch'])
+            ->where('church_id', $church->id)
+            ->latest('recorded_at')
+            ->get();
 
         $armFilter = $request->query('arm', 'all');
         $arms = Arms::enabled();
@@ -38,18 +52,16 @@ class GivingController extends Controller
             $armLabel = 'All Arms';
         }
 
-        $partnersQuery = Partner::query();
-        if ($churchIds !== null) {
-            $partnersQuery->whereIn('church_id', $churchIds);
-        }
-
         return view('givings.index', [
             'view' => $view,
             'armFilter' => $armFilter,
             'armLabel' => $armLabel,
             'arms' => $arms,
-            'partners' => $partnersQuery->orderBy('first_name')->get(),
+            // Only this church's partners can be picked in "Record Giving"
+            'partners' => Partner::where('church_id', $church->id)->orderBy('first_name')->get(),
             'totalShown' => $view->sum('amount'),
+            'church' => $church,
+            'groupChurch' => $church->groupChurch,
         ]);
     }
 
@@ -91,7 +103,7 @@ class GivingController extends Controller
             return back()->with('error', 'Enter an amount for at least one arm.');
         }
 
-        $entry = DB::transaction(function () use ($partner, $user, $data, $submitted) {
+        DB::transaction(function () use ($partner, $user, $data, $submitted) {
             // Lock the partner's single running record (create it if this is their first gift)
             $entry = PartnershipEntry::where('partner_id', $partner->id)
                 ->lockForUpdate()
@@ -135,8 +147,6 @@ class GivingController extends Controller
                     'changes' => $changes,
                 ],
             ]);
-
-            return $entry;
         });
 
         return back()->with('success', 'Giving recorded.');

@@ -15,7 +15,6 @@ use App\Http\Controllers\StatementController;
 use App\Http\Controllers\UploadController;
 use Illuminate\Support\Facades\Route;
 
-
 Route::get('/', LandingController::class)->name('home');
 
 Route::middleware('guest')->group(function () {
@@ -36,8 +35,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/groups', [GroupChurchController::class, 'index'])->name('groups.index');
         Route::post('/groups', [GroupChurchController::class, 'store'])->name('groups.store');
         Route::put('/groups/{group}', [GroupChurchController::class, 'update'])->name('groups.update');
-    Route::delete('/groups/{group}', [GroupChurchController::class, 'destroy'])->name('groups.destroy');
-    
+        Route::delete('/groups/{group}', [GroupChurchController::class, 'destroy'])->name('groups.destroy');
+
         Route::get('/statements', [StatementController::class, 'index'])->name('statements.index');
         Route::post('/statements', [StatementController::class, 'store'])->name('statements.store');
         Route::post('/statements/{statement}/send', [StatementController::class, 'send'])->name('statements.send');
@@ -45,7 +44,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/arms', [ArmController::class, 'index'])->name('arms.index');
         Route::post('/arms', [ArmController::class, 'store'])->name('arms.store');
         Route::patch('/arms/{arm}', [ArmController::class, 'update'])->name('arms.update');
-        
+
         Route::post('/alerts/thresholds', [AlertController::class, 'saveThreshold'])->name('alerts.thresholds.save');
     });
 
@@ -53,23 +52,31 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:zone_admin,group_admin')->group(function () {
         Route::get('/churches', [ChurchController::class, 'index'])->name('churches.index');
         Route::post('/churches', [ChurchController::class, 'store'])->name('churches.store');
-        Route::put('churches/{church}', [ChurchController::class, 'update'])->name('churches.update');
-Route::delete('churches/{church}', [ChurchController::class, 'destroy'])->name('churches.destroy');
+        Route::put('/churches/{church}', [ChurchController::class, 'update'])->name('churches.update');
+        Route::delete('/churches/{church}', [ChurchController::class, 'destroy'])->name('churches.destroy');
     });
 
     // ALL ADMINS (ZONE, GROUP, CHURCH) ROUTES
     Route::middleware('role:zone_admin,group_admin,church_admin')->group(function () {
-        Route::put('/partners/{partner}', [PartnerController::class, 'update'])->name('partners.update');
-Route::delete('/partners/{partner}', [PartnerController::class, 'destroy'])->name('partners.destroy');
-        Route::get('/partners/export', [PartnerController::class, 'export'])->name('partners.export');
-        Route::get('/partners', [PartnerController::class, 'index'])->name('partners.index');
-        Route::post('/partners', [PartnerController::class, 'store'])->name('partners.store');
-        
 
-        Route::put('/givings/{entry}', [GivingController::class, 'update'])->name('givings.update');
-Route::delete('/givings/{entry}', [GivingController::class, 'destroy'])->name('givings.destroy');
+        // PARTNERS — Page 1: groups  ->  Page 2: churches in a group  ->  Page 3: a church's partners
+        Route::get('/partners', [PartnerController::class, 'index'])->name('partners.index');
+        Route::get('/partners/export', [PartnerController::class, 'export'])->name('partners.export');
+        Route::get('/partners/groups/{group}', [PartnerController::class, 'group'])
+            ->where('group', 'none|[0-9]+')->name('partners.group');
+        Route::get('/partners/churches/{church}', [PartnerController::class, 'church'])->name('partners.church');
+        Route::post('/partners', [PartnerController::class, 'store'])->name('partners.store');
+        Route::put('/partners/{partner}', [PartnerController::class, 'update'])->name('partners.update');
+        Route::delete('/partners/{partner}', [PartnerController::class, 'destroy'])->name('partners.destroy');
+
+        // GIVINGS — same three-level flow
         Route::get('/givings', [GivingController::class, 'index'])->name('givings.index');
+        Route::get('/givings/groups/{group}', [GivingController::class, 'group'])
+            ->where('group', 'none|[0-9]+')->name('givings.group');
+        Route::get('/givings/churches/{church}', [GivingController::class, 'church'])->name('givings.church');
         Route::post('/givings', [GivingController::class, 'store'])->name('givings.store');
+        Route::put('/givings/{entry}', [GivingController::class, 'update'])->name('givings.update');
+        Route::delete('/givings/{entry}', [GivingController::class, 'destroy'])->name('givings.destroy');
 
         Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
         Route::get('/audit/export', [AuditController::class, 'export'])->name('audit.export');

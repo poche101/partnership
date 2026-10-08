@@ -1,10 +1,17 @@
 @extends('layouts.app')
-@section('title', 'Givings')
+@section('title', $church->name.' · Givings')
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+
+    <nav class="text-sm text-muted-foreground">
+        <a href="{{ route('givings.index') }}" class="underline">Givings</a> ›
+        <a href="{{ route('givings.group', $groupChurch?->id ?? 'none') }}" class="underline">{{ $groupChurch?->name ?? 'No group church' }}</a> ›
+        <span>{{ $church->name }}</span>
+    </nav>
+
+    <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h1 class="font-display text-xl sm:text-2xl text-primary">Givings</h1>
+            <h1 class="font-display text-xl sm:text-2xl text-primary">{{ $church->name }}</h1>
             <div class="mt-2 flex flex-wrap items-center gap-3">
                 <span class="text-sm text-muted-foreground">Showing: <strong>{{ $armLabel }}</strong></span>
                 <span class="givings-total-badge">
@@ -18,9 +25,9 @@
     </div>
 
     <div class="mt-4 flex flex-wrap gap-2">
-        <a href="{{ route('givings.index') }}" class="badge {{ $armFilter === 'all' ? 'bg-accent text-accent-foreground' : '' }}">All Arms</a>
+        <a href="{{ route('givings.church', $church) }}" class="badge {{ $armFilter === 'all' ? 'bg-accent text-accent-foreground' : '' }}">All Arms</a>
         @foreach ($arms as $arm)
-            <a href="{{ route('givings.index', ['arm' => $arm['key']]) }}" class="badge {{ $armFilter === $arm['key'] ? 'bg-accent text-accent-foreground' : '' }}">{{ $arm['label'] }}</a>
+            <a href="{{ route('givings.church', [$church, 'arm' => $arm['key']]) }}" class="badge {{ $armFilter === $arm['key'] ? 'bg-accent text-accent-foreground' : '' }}">{{ $arm['label'] }}</a>
         @endforeach
     </div>
 
@@ -28,7 +35,7 @@
     <div class="giv-search-row" role="search">
         <div class="giv-search-wrap">
             <svg class="giv-search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z"/></svg>
-            <input type="search" id="giving-search" placeholder="Search by partner, spouse, church, phone, email…" autocomplete="off">
+            <input type="search" id="giving-search" placeholder="Search by partner, spouse, phone, email…" autocomplete="off">
             <button type="button" id="giving-search-clear" class="giv-search-clear is-hidden" aria-label="Clear search" title="Clear search">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
@@ -101,6 +108,15 @@
                                 $entry->recorded_at?->format('M j, Y'),
                                 number_format($row['amount'], 2),
                             ])));
+
+                            // Everything the shared edit modal needs, carried on the button.
+                            $editData = [
+                                'id' => $entry->id,
+                                'partner' => $partnerName === '—' ? 'this partner' : $partnerName,
+                                'church' => $entry->church?->name ?? '—',
+                                'note' => $entry->note,
+                                'arms' => collect($arms)->mapWithKeys(fn ($a) => [$a['key'] => (float) $entry->{$a['key']}])->all(),
+                            ];
                         @endphp
                         <tr class="giving-row" data-search="{{ $searchText }}">
                             {{-- Partner Name --}}
@@ -172,15 +188,18 @@
                                        class="text-xs text-muted-foreground underline">
                                         History
                                     </a>
-                                    <button type="button" data-open-modal="edit-giving-{{ $entry->id }}"
-                                        class="btn-icon-only" title="Edit giving record">
+                                    <button type="button" data-open-modal="edit-giving"
+                                        data-giving="{{ json_encode($editData) }}"
+                                        class="btn-icon-only js-edit-giving" title="Edit giving record">
                                         <svg viewBox="0 0 20 20" fill="none" class="btn-svg">
                                             <path d="M13.5 3.5l3 3L6 17H3v-3L13.5 3.5z" stroke="currentColor"
                                                 stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                                         </svg>
                                     </button>
-                                    <button type="button" data-open-modal="delete-giving-{{ $entry->id }}"
-                                        class="btn-icon-only btn-icon-danger" title="Delete giving record">
+                                    <button type="button" data-open-modal="delete-giving"
+                                        data-id="{{ $entry->id }}" data-name="{{ $partnerName }}"
+                                        data-total="{{ number_format($entry->total_espees, 2) }}"
+                                        class="btn-icon-only btn-icon-danger js-delete-giving" title="Delete giving record">
                                         <svg viewBox="0 0 20 20" fill="none" class="btn-svg">
                                             <path
                                                 d="M4 6h12M8 6V4.5A1.5 1.5 0 019.5 3h1A1.5 1.5 0 0112 4.5V6m-6.5 0l.6 9.4a1.5 1.5 0 001.5 1.6h3.8a1.5 1.5 0 001.5-1.6L14.5 6"
@@ -211,78 +230,70 @@
 </div>
 
 {{--
-    Edit and Delete modals for each giving entry are rendered here, OUTSIDE
-    the table, using the same two-layer centering wrapper as the rest of the
-    app (outer = fixed + overflow-y-auto, inner = flex items-center
-    justify-center). Nesting them inside the table would hide them behind a
-    display:none ancestor no matter what the modal's own class says.
+    ONE shared Edit modal and ONE shared Delete modal for the whole page
+    (instead of a pair per giving record, which exhausted PHP's memory on
+    larger churches). The edit/delete buttons carry the record's data and the
+    script below fills these two modals when a button is clicked.
+
+    Modals use the two-layer centering wrapper (outer = fixed + overflow-y-auto,
+    inner = flex items-center justify-center).
 --}}
-@foreach ($view as $row)
-    @php
-        $entry = $row['entry'];
-        $partner = $entry->partner;
-        $partnerName = $partner
-            ? trim(($partner->title ?? '').' '.$partner->first_name.' '.$partner->last_name)
-            : 'this partner';
-    @endphp
 
-    {{-- Edit Giving Modal --}}
-    <div id="edit-giving-{{ $entry->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/40">
-        <div class="flex min-h-full items-center justify-center p-4">
-            <div class="card w-full max-w-2xl p-4 sm:p-6">
-                <h2 class="font-display text-lg text-primary">Edit Giving Record</h2>
-                <p class="mt-1 text-sm text-muted-foreground">{{ $partnerName }} &middot; {{ $entry->church?->name ?? '—' }}</p>
-                <form method="POST" action="{{ route('givings.update', $entry) }}" class="mt-4 space-y-4">
-                    @csrf
-                    @method('PUT')
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        @foreach ($arms as $arm)
-                            <div>
-                                <label class="field-label">{{ $arm['label'] }}</label>
-                                <input type="number" step="0.01" min="0" name="{{ $arm['key'] }}"
-                                    value="{{ $entry->{$arm['key']} }}" class="field-input">
-                            </div>
-                        @endforeach
-                    </div>
-                    <div>
-                        <label class="field-label">Note</label>
-                        <textarea name="note" rows="2" class="field-input">{{ $entry->note }}</textarea>
-                    </div>
-                    <div class="flex flex-wrap justify-end gap-2 pt-2">
-                        <button type="button" data-close-modal="edit-giving-{{ $entry->id }}"
-                            class="btn-outline">Cancel</button>
-                        <button type="submit" class="btn-primary">Save Changes</button>
-                    </div>
-                </form>
-            </div>
+{{-- Shared Edit Giving Modal --}}
+<div id="edit-giving" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/40">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="card w-full max-w-2xl p-4 sm:p-6">
+            <h2 class="font-display text-lg text-primary">Edit Giving Record</h2>
+            <p id="edit-giving-subtitle" class="mt-1 text-sm text-muted-foreground"></p>
+            <form id="edit-giving-form" method="POST" action="" class="mt-4 space-y-4">
+                @csrf
+                @method('PUT')
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    @foreach ($arms as $arm)
+                        <div>
+                            <label class="field-label">{{ $arm['label'] }}</label>
+                            <input type="number" step="0.01" min="0" name="{{ $arm['key'] }}" value="0" class="field-input">
+                        </div>
+                    @endforeach
+                </div>
+                <div>
+                    <label class="field-label">Note</label>
+                    <textarea name="note" rows="2" class="field-input"></textarea>
+                </div>
+                <div class="flex flex-wrap justify-end gap-2 pt-2">
+                    <button type="button" data-close-modal="edit-giving" class="btn-outline">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 
-    {{-- Delete Giving Confirmation Modal --}}
-    <div id="delete-giving-{{ $entry->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/40">
-        <div class="flex min-h-full items-center justify-center p-4">
-            <div class="card w-full max-w-md p-4 sm:p-6">
-                <h2 class="font-display text-lg text-primary">Delete Giving Record</h2>
-                <p class="mt-2 text-sm text-muted-foreground">
-                    Are you sure you want to delete this giving record for <strong>{{ $partnerName }}</strong>
-                    ({{ number_format($entry->total_espees, 2) }} ESPEES)? This action cannot be undone.
-                </p>
-                <form method="POST" action="{{ route('givings.destroy', $entry) }}" class="mt-6 flex flex-wrap justify-end gap-2">
-                    @csrf
-                    @method('DELETE')
-                    <button type="button" data-close-modal="delete-giving-{{ $entry->id }}"
-                        class="btn-outline">Cancel</button>
-                    <button type="submit" class="btn-primary btn-danger">Delete</button>
-                </form>
-            </div>
+{{-- Shared Delete Giving Confirmation Modal --}}
+<div id="delete-giving" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/40">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="card w-full max-w-md p-4 sm:p-6">
+            <h2 class="font-display text-lg text-primary">Delete Giving Record</h2>
+            <p class="mt-2 text-sm text-muted-foreground">
+                Are you sure you want to delete this giving record for <strong id="delete-giving-name"></strong>
+                (<span id="delete-giving-total"></span> ESPEES)? This action cannot be undone.
+            </p>
+            <form id="delete-giving-form" method="POST" action="" class="mt-6 flex flex-wrap justify-end gap-2">
+                @csrf
+                @method('DELETE')
+                <button type="button" data-close-modal="delete-giving" class="btn-outline">Cancel</button>
+                <button type="submit" class="btn-primary btn-danger">Delete</button>
+            </form>
         </div>
     </div>
-@endforeach
+</div>
 
+{{-- Record Giving: only this church's partners can be picked --}}
 <div id="new-giving" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/40">
     <div class="flex min-h-full items-center justify-center p-4">
         <div class="card w-full max-w-2xl p-4 sm:p-6">
             <h2 class="font-display text-lg text-primary">Record Giving</h2>
+            <p class="mt-1 text-sm text-muted-foreground">{{ $church->name }}</p>
             <form id="new-giving-form" method="POST" action="{{ route('givings.store') }}" class="mt-4 space-y-4">
                 @csrf
                 <div>
@@ -366,6 +377,43 @@
         </div>
     </div>
 </div>
+
+{{-- Shared edit / delete modals: fill them from the clicked row --}}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const updateUrl  = @json(route('givings.update',  ['entry' => '__ID__']));
+    const destroyUrl = @json(route('givings.destroy', ['entry' => '__ID__']));
+
+    const editForm = document.getElementById('edit-giving-form');
+    const editSubtitle = document.getElementById('edit-giving-subtitle');
+
+    document.querySelectorAll('.js-edit-giving').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const d = JSON.parse(btn.dataset.giving);
+            editForm.action = updateUrl.replace('__ID__', d.id);
+            editSubtitle.textContent = d.partner + ' · ' + d.church;
+
+            Object.entries(d.arms).forEach(([key, value]) => {
+                const field = editForm.elements[key];
+                if (field) field.value = value ?? 0;
+            });
+            editForm.elements['note'].value = d.note ?? '';
+        });
+    });
+
+    const deleteForm = document.getElementById('delete-giving-form');
+    const deleteName = document.getElementById('delete-giving-name');
+    const deleteTotal = document.getElementById('delete-giving-total');
+
+    document.querySelectorAll('.js-delete-giving').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            deleteForm.action = destroyUrl.replace('__ID__', btn.dataset.id);
+            deleteName.textContent = btn.dataset.name;
+            deleteTotal.textContent = btn.dataset.total;
+        });
+    });
+});
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {

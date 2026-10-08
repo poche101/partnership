@@ -1,6 +1,62 @@
 @extends('layouts.app')
 @section('title', 'Bulk Upload')
 @section('content')
+@php
+    /*
+     * Group churches shown in the dropdown, in this order.
+     * (Numbering removed; the double space in "Ikoyi  Group 1/2" is tidied.)
+     */
+    $groupList = [
+        'Lekki Group',
+        'Obalende Group',
+        'Lekki Free Trade Zone Group',
+        'Chevron Group',
+        'Lagos Island Group',
+        'Victoria Island Group',
+        'Ajah Group',
+        'Owode-Badore Group',
+        'Ajiwe Group',
+        'Mobil Road Group',
+        'Ogombo Group',
+        'Alasia Group',
+        'Tedo Group',
+        'Kajola Group',
+        'Onishon Group',
+        'Eputu Group',
+        'Epe Group',
+        'Brazil Group',
+        'Youth Church Group',
+        'Teens Church Group',
+        'Lekki Phase 1 Sub Group',
+        'Eleko Sub Group',
+        'Ikoyi Group 1',
+        'Ikoyi Group 2',
+        'Victoria Island Sub-Group',
+        'Abijo Sub-Group',
+    ];
+
+    // Match each listed name to the group church saved in the app, ignoring case,
+    // extra spaces and hyphens. The two Ikoyi groups are saved as "Ikoyi Sub-Group 1/2".
+    $norm = fn ($s) => mb_strtolower(trim(preg_replace('/[\s\-]+/', ' ', (string) $s)));
+    $aliases = ['ikoyi group 1' => 'ikoyi sub group 1', 'ikoyi group 2' => 'ikoyi sub group 2'];
+    $dbGroups = \App\Models\GroupChurch::get(['id', 'name'])->keyBy(fn ($g) => $norm($g->name));
+
+    // Zone admins see every group; group/church admins only the groups they can reach.
+    $allowedGroupIds = auth()->user()->isZoneAdmin()
+        ? null
+        : $churches->pluck('group_church_id')->filter()->unique()->values()->all();
+
+    $groupOptions = collect($groupList)
+        ->map(function ($name) use ($norm, $aliases, $dbGroups) {
+            $key = $norm($name);
+            $g = $dbGroups->get($key) ?? $dbGroups->get($aliases[$key] ?? '');
+            return ['name' => $name, 'id' => $g?->id];
+        })
+        ->filter(fn ($o) => $allowedGroupIds === null || ($o['id'] && in_array($o['id'], $allowedGroupIds)))
+        ->values();
+
+    $singleGroup = $groupOptions->count() === 1 ? $groupOptions->first() : null;
+@endphp
 <div class="mx-auto max-w-6xl px-6 py-8">
     <h1 class="font-display text-2xl text-primary">Bulk Upload</h1>
     <p class="mt-1 text-sm text-muted-foreground">
@@ -9,47 +65,51 @@
     </p>
 
     <div class="card mt-6 p-6">
-        @if ($churches->count())
+        @if ($groupOptions->count())
             <div class="mb-4">
-                <label class="field-label">Church</label>
+                <label class="field-label">Group church</label>
 
-                <div class="combobox relative max-w-sm" id="church-combobox">
+                <div class="combobox relative max-w-sm" id="group-combobox">
                     <button
                         type="button"
-                        id="church-trigger"
+                        id="group-trigger"
                         class="field-input flex w-full items-center justify-between gap-2 text-left"
                         aria-haspopup="listbox"
                         aria-expanded="false"
                     >
-                        <span id="church-trigger-label" class="truncate">
-                            {{ $churches->first()->name ?? 'Select church…' }}
-                        </span>
+                        <span id="group-trigger-label" class="truncate text-muted-foreground">Select group church…</span>
                         <svg viewBox="0 0 20 20" fill="none" class="combobox-chevron">
                             <path d="M5.5 7.5L10 12l4.5-4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </button>
 
-                    <div id="church-panel" class="combobox-panel hidden">
+                    <div id="group-panel" class="combobox-panel hidden">
                         <input
                             type="text"
-                            id="church-search"
+                            id="group-search"
                             class="combobox-search"
-                            placeholder="Search churches…"
+                            placeholder="Search group churches…"
                             autocomplete="off"
                         >
-                        <ul id="church-options" class="combobox-options" role="listbox">
-                            @foreach ($churches as $c)
-                                <li role="option" class="combobox-option" data-id="{{ $c->id }}" data-name="{{ $c->name }}">
-                                    {{ $c->name }}
+                        <ul id="group-options" class="combobox-options" role="listbox">
+                            <li role="option" class="combobox-option" data-clear data-id="" data-name="">
+                                <em>None — use each row's group_name</em>
+                            </li>
+                            @foreach ($groupOptions as $g)
+                                <li role="option" class="combobox-option" data-id="{{ $g['id'] }}" data-name="{{ $g['name'] }}">
+                                    {{ $g['name'] }}
                                 </li>
                             @endforeach
                         </ul>
-                        <p id="church-no-results" class="combobox-empty hidden">No churches match your search.</p>
+                        <p id="group-no-results" class="combobox-empty hidden">No group churches match your search.</p>
                     </div>
                 </div>
 
-                <input type="hidden" id="church-select" value="{{ $churches->first()->id ?? '' }}">
-                <p class="mt-1 text-xs text-muted-foreground">Used for rows that don't specify their own Church Name column.</p>
+                <input type="hidden" id="group-select" value="">
+                <p class="mt-1 text-xs text-muted-foreground">
+                    Each row's <code>church_name</code> is matched inside this group. Rows with their own
+                    <code>group_name</code> use that instead.
+                </p>
             </div>
         @endif
 
@@ -74,6 +134,8 @@
         <div id="preview-wrap" class="mt-6 hidden">
             <h2 class="font-display text-lg text-primary">Preview (<span id="preview-count"></span> rows)</h2>
 
+            <div id="preview-warning" class="mt-2 hidden rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"></div>
+
             <div class="registry mt-2">
                 <div class="registry-scroll" style="max-height: 20rem; overflow-y: auto;">
                     <table class="registry-table">
@@ -81,7 +143,7 @@
                             <tr class="registry-group-row">
                                 <th colspan="5" class="registry-group-header registry-group-partner">Partner Details</th>
                                 <th colspan="5" class="registry-group-header registry-group-spouse">Spouse Details</th>
-                                <th rowspan="2" class="registry-group-header registry-group-giving">Church</th>
+                                <th rowspan="2" class="registry-group-header registry-group-giving">Church / Group</th>
                                 <th rowspan="2" class="registry-group-header registry-group-giving">Giving Total</th>
                             </tr>
                             <tr>
@@ -130,8 +192,7 @@
         border-color: var(--primary, #3B5A73);
     }
 
-    /* Church combobox */
-    .combobox { }
+    /* Group church combobox */
     .combobox-chevron {
         width: 16px;
         height: 16px;
@@ -139,7 +200,7 @@
         color: var(--muted-foreground, #7A756B);
         transition: transform 0.12s ease;
     }
-    #church-trigger[aria-expanded="true"] .combobox-chevron {
+    #group-trigger[aria-expanded="true"] .combobox-chevron {
         transform: rotate(180deg);
     }
     .combobox-panel {
@@ -273,7 +334,13 @@
         color: var(--foreground, #1F1B16);
         line-height: 1.3;
     }
+    .registry-sub {
+        font-size: 0.75rem;
+        color: var(--muted-foreground, #8A8578);
+        margin-top: 0.1rem;
+    }
     .registry-muted { color: var(--muted-foreground, #B3AEA1); }
+    .registry-missing { color: #B3261E; font-weight: 500; }
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -284,8 +351,10 @@ const PARTNER_FIELDS = [
     'church_name','church_category','group_name',
     'spouse_title','spouse_first_name','spouse_last_name','spouse_delegate_category','spouse_kingschat','spouse_phone','spouse_email',
 ];
+const SINGLE_GROUP = @json($singleGroup);
 
 let parsedRows = [];
+let selectedGroup = { id: '', name: '' };
 
 // Template download: built in the browser from PARTNER_FIELDS + ARM_KEYS,
 // so the columns always match what the importer expects.
@@ -326,24 +395,32 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;');
 }
 
-// Church combobox: a button showing the current selection opens a panel
+// Group church combobox: a button showing the current selection opens a panel
 // containing the search box and the option list together. Typing filters
-// the list in place; clicking an option sets the hidden #church-select
-// input (still what confirm-import and renderPreview read from) and
-// updates the trigger label, then closes the panel.
+// the list in place; clicking an option sets the hidden #group-select
+// input and updates the trigger label, then closes the panel.
 document.addEventListener('DOMContentLoaded', () => {
-    const root = document.getElementById('church-combobox');
-    const trigger = document.getElementById('church-trigger');
-    const triggerLabel = document.getElementById('church-trigger-label');
-    const panel = document.getElementById('church-panel');
-    const search = document.getElementById('church-search');
-    const optionsList = document.getElementById('church-options');
-    const noResults = document.getElementById('church-no-results');
-    const hiddenInput = document.getElementById('church-select');
+    const root = document.getElementById('group-combobox');
+    const trigger = document.getElementById('group-trigger');
+    const triggerLabel = document.getElementById('group-trigger-label');
+    const panel = document.getElementById('group-panel');
+    const search = document.getElementById('group-search');
+    const optionsList = document.getElementById('group-options');
+    const noResults = document.getElementById('group-no-results');
+    const hiddenInput = document.getElementById('group-select');
 
     if (!root || !trigger || !panel || !search || !optionsList || !hiddenInput) return;
 
     const options = Array.from(optionsList.querySelectorAll('.combobox-option'));
+    const placeholder = 'Select group church…';
+
+    function setGroup(id, name) {
+        selectedGroup = { id: id || '', name: name || '' };
+        hiddenInput.value = selectedGroup.id;
+        triggerLabel.textContent = name || placeholder;
+        triggerLabel.classList.toggle('text-muted-foreground', !name);
+        if (parsedRows.length) renderPreview();
+    }
 
     function openPanel() {
         panel.classList.remove('hidden');
@@ -381,9 +458,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let anyVisible = false;
 
         options.forEach((o) => {
-            const matches = !term || o.dataset.name.toLowerCase().includes(term);
+            const isClear = o.hasAttribute('data-clear');
+            const matches = isClear || !term || o.dataset.name.toLowerCase().includes(term);
             o.hidden = !matches;
-            if (matches) anyVisible = true;
+            if (matches && !isClear) anyVisible = true;
         });
 
         noResults.classList.toggle('hidden', anyVisible);
@@ -391,11 +469,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     options.forEach((opt) => {
         opt.addEventListener('click', () => {
-            hiddenInput.value = opt.dataset.id;
-            triggerLabel.textContent = opt.dataset.name;
+            setGroup(opt.dataset.id, opt.dataset.name);
             closePanel();
         });
     });
+
+    // A group/church admin who only has one group doesn't need to choose.
+    if (SINGLE_GROUP) setGroup(SINGLE_GROUP.id ?? '', SINGLE_GROUP.name);
 });
 
 document.getElementById('file-input').addEventListener('change', (e) => {
@@ -427,11 +507,21 @@ document.getElementById('file-input').addEventListener('change', (e) => {
 });
 
 function renderPreview() {
-    const churchTriggerLabel = document.getElementById('church-trigger-label');
-    const fallbackChurchName = churchTriggerLabel ? churchTriggerLabel.textContent.trim() : '';
+    const fallbackGroupName = selectedGroup.name;
 
     document.getElementById('preview-wrap').classList.remove('hidden');
     document.getElementById('preview-count').textContent = parsedRows.length;
+
+    // A group can't stand in for a church, so every row needs its own church_name.
+    const missing = parsedRows.filter((r) => !r.partner.church_name).length;
+    const warn = document.getElementById('preview-warning');
+    warn.classList.toggle('hidden', missing === 0);
+    warn.textContent = missing
+        ? `${missing} row(s) have no church_name. Add a church_name to those rows before importing.`
+        : '';
+    document.getElementById('confirm-import').disabled = missing > 0;
+
+    const muted = (v) => v ? escapeHtml(v) : '<span class="registry-muted">—</span>';
 
     const body = document.getElementById('preview-body');
     body.innerHTML = parsedRows.slice(0, 50).map((r) => {
@@ -443,9 +533,13 @@ function renderPreview() {
             ? [r.partner.spouse_title, r.partner.spouse_first_name, r.partner.spouse_last_name].filter(Boolean).join(' ')
             : '';
 
-        const church = r.partner.church_name || fallbackChurchName || '—';
+        const churchName = r.partner.church_name || '';
+        const groupName = r.partner.group_name || fallbackGroupName;
 
-        const muted = (v) => v ? escapeHtml(v) : '<span class="registry-muted">—</span>';
+        const churchCell = churchName
+            ? `<div class="registry-name">${escapeHtml(churchName)}</div>`
+            : '<div class="registry-missing">No church</div>';
+        const groupCell = groupName ? `<div class="registry-sub">${escapeHtml(groupName)}</div>` : '';
 
         return `<tr>
             <td><div class="registry-name">${escapeHtml(partnerName)}</div></td>
@@ -458,14 +552,13 @@ function renderPreview() {
             <td>${hasSpouse ? muted(r.partner.spouse_phone) : '<span class="registry-muted">—</span>'}</td>
             <td>${hasSpouse ? muted(r.partner.spouse_email) : '<span class="registry-muted">—</span>'}</td>
             <td>${hasSpouse ? muted(r.partner.spouse_kingschat) : '<span class="registry-muted">—</span>'}</td>
-            <td>${escapeHtml(church)}</td>
+            <td>${churchCell}${groupCell}</td>
             <td class="font-mono">${total.toFixed(2)}</td>
         </tr>`;
     }).join('');
 }
 
 document.getElementById('confirm-import').addEventListener('click', async () => {
-    const churchSelect = document.getElementById('church-select');
     const btn = document.getElementById('confirm-import');
     btn.disabled = true;
     btn.textContent = 'Importing…';
@@ -479,7 +572,9 @@ document.getElementById('confirm-import').addEventListener('click', async () => 
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
-                church_id: churchSelect ? churchSelect.value : null,
+                group_church_id: selectedGroup.id || null,
+                group_name: selectedGroup.name || null,
+                church_id: null,
                 rows: parsedRows,
             }),
         });
@@ -488,6 +583,9 @@ document.getElementById('confirm-import').addEventListener('click', async () => 
         resultEl.classList.remove('hidden');
         if (res.ok) {
             resultEl.textContent = `Imported ${data.partners} partner(s) and ${data.entries} giving record(s).`;
+            if (Array.isArray(data.skipped) && data.skipped.length) {
+                resultEl.textContent += ` ${data.skipped.length} skipped: ` + data.skipped.slice(0, 10).join('; ');
+            }
         } else {
             resultEl.textContent = data.message || 'Import failed.';
         }

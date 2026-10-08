@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\PartnersExport;
+use App\Http\Controllers\Concerns\DrillsDown;
 use App\Models\Church;
 use App\Models\Partner;
 use App\Services\SemanticPartnerSearch;
@@ -12,25 +13,40 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class PartnerController extends Controller
 {
+    use DrillsDown;
+
     const DELEGATE_CATEGORIES = ['Partner', 'Church Pastor/Director'];
 
-    public function index(Request $request)
+    /** Page 1: one line per group church */
+    public function index()
     {
-        $user = Auth::user();
-        $churchIds = $user->visibleChurchIds();
+        return $this->groupPage('partners');
+    }
 
-        $query = Partner::with('church.groupChurch')->latest();
-        if ($churchIds !== null) {
-            $query->whereIn('church_id', $churchIds);
-        }
+    /** Page 2: churches under a group */
+    public function group(string $group)
+    {
+        return $this->churchPage('partners', $group);
+    }
+
+    /** Page 3: one church's partners */
+    public function church(Request $request, Church $church)
+    {
+        $this->authorizeChurch($church);
+        $user = Auth::user();
 
         $q = trim((string) $request->query('q', ''));
         $aiMode = $user->isZoneAdmin() && $request->boolean('ai');
-        $partners = collect();
+
+        $query = Partner::with('church.groupChurch')
+            ->where('church_id', $church->id)
+            ->latest();
 
         if ($aiMode && $q !== '') {
             $ids = app(SemanticPartnerSearch::class)->search($q);
-            $partners = Partner::with('church.groupChurch')->whereIn('id', $ids)->get()
+            $partners = Partner::with('church.groupChurch')
+                ->where('church_id', $church->id)
+                ->whereIn('id', $ids)->get()
                 ->sortBy(fn ($p) => array_search($p->id, $ids))->values();
         } else {
             if ($q !== '') {
@@ -49,7 +65,10 @@ class PartnerController extends Controller
             $partners = $query->get();
         }
 
-        $churches = $churchIds === null ? Church::orderBy('name')->get(['id', 'name']) : Church::whereIn('id', $churchIds)->get(['id', 'name']);
+        $churchIds = $user->visibleChurchIds();
+        $churches = $churchIds === null
+            ? Church::orderBy('name')->get(['id', 'name'])
+            : Church::whereIn('id', $churchIds)->orderBy('name')->get(['id', 'name']);
 
         return view('partners.index', [
             'partners' => $partners,
@@ -57,6 +76,8 @@ class PartnerController extends Controller
             'delegateCategories' => self::DELEGATE_CATEGORIES,
             'q' => $q,
             'aiMode' => $aiMode,
+            'church' => $church,
+            'groupChurch' => $church->groupChurch,
         ]);
     }
 
@@ -78,8 +99,7 @@ class PartnerController extends Controller
         $data['church_id'] = $churchId;
 
         // Keep spouse_name (used by the Givings statement/table) in sync with
-        // the detailed spouse fields collected here, so a partner created via
-        // this form shows their spouse consistently everywhere.
+        // the detailed spouse fields collected here.
         $data['spouse_name'] = $this->buildSpouseName($data);
 
         Partner::create($data);
@@ -105,8 +125,7 @@ class PartnerController extends Controller
         unset($data['church_id']);
         $data['church_id'] = $churchId;
 
-        // Keep spouse_name in sync — including clearing it back out if the
-        // spouse fields were emptied on this edit.
+        // Keep spouse_name in sync, including clearing it if the spouse fields were emptied.
         $data['spouse_name'] = $this->buildSpouseName($data);
 
         $partner->update($data);
@@ -155,8 +174,7 @@ class PartnerController extends Controller
 
     /**
      * Builds the flat spouse_name string (used by the Givings statement/table)
-     * from the detailed spouse fields. Returns '' when no spouse fields are set,
-     * so updates correctly clear spouse_name if the spouse details are removed.
+     * from the detailed spouse fields. Returns '' when no spouse fields are set.
      */
     private function buildSpouseName(array $data): string
     {
@@ -166,7 +184,7 @@ class PartnerController extends Controller
     }
 
     /**
-     * Ensures the authenticated user is allowed to modify the given partner,
+     * Ensures the authenticated user may modify the given partner,
      * i.e. the partner's church is within the user's visible scope.
      */
     private function authorizePartnerAccess($user, Partner $partner): void
