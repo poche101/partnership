@@ -96,7 +96,7 @@
                                     'spouse_phone', 'spouse_email',
                                 ]);
                             @endphp
-                            <tr>
+                            <tr class="partner-row">
                                 {{-- Partner Name --}}
                                 <td>
                                     <div class="registry-partner">
@@ -190,6 +190,12 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+
+        {{-- Load more (15 at a time) — revealed by the script when there is more than one page --}}
+        <div id="partner-more-wrap" class="more-wrap is-hidden">
+            <span id="partner-more-label" class="more-count" aria-live="polite"></span>
+            <button type="button" id="partner-more" class="btn-outline more-btn is-hidden">Load more</button>
         </div>
     </div>
 
@@ -449,7 +455,71 @@
     });
     </script>
 
+    {{-- Partners list: "Load more" (15 at a time) --}}
+    <script>
+    (function () {
+        const PAGE_SIZE = 15;
+
+        const rows = Array.from(document.querySelectorAll('tr.partner-row'));
+        const wrap = document.getElementById('partner-more-wrap');
+        const btn = document.getElementById('partner-more');
+        const label = document.getElementById('partner-more-label');
+
+        if (!wrap || !btn || !label) return;
+
+        let limit = PAGE_SIZE;
+
+        function render() {
+            rows.forEach((row, i) => row.classList.toggle('is-hidden', i >= limit));
+
+            const shown = Math.min(limit, rows.length);
+            const remaining = rows.length - shown;
+
+            // Nothing to paginate when everything fits on the first page.
+            wrap.classList.toggle('is-hidden', rows.length <= PAGE_SIZE);
+            label.textContent = `Showing ${shown} of ${rows.length}`;
+
+            btn.classList.toggle('is-hidden', remaining <= 0);
+            if (remaining > 0) {
+                btn.textContent = `Load ${Math.min(PAGE_SIZE, remaining)} more (${remaining} remaining)`;
+            }
+        }
+
+        btn.addEventListener('click', () => {
+            limit += PAGE_SIZE;
+            render();
+        });
+
+        render();
+    })();
+    </script>
+
     <style>
+        .is-hidden {
+            display: none !important;
+        }
+
+        /* Load more */
+        .more-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .more-count {
+            font-size: 0.8rem;
+            color: var(--muted-foreground, #7A756B);
+        }
+
+        .more-btn {
+            padding: 10px 22px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
         .registry {
             border: 1px solid var(--border, #E5E1D8);
             border-radius: 8px;
